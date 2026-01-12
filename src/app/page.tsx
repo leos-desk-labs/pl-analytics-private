@@ -55,8 +55,8 @@ export default function OverviewPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-white">Views Dashboard</h1>
-        <p className="text-gray-400 mt-1">2026 Goal: Grow through Views</p>
+        <h1 className="text-4xl font-bold text-brand-lime">Executive Overview</h1>
+        <p className="text-gray-400 mt-1">Peoples League Media Network Performance</p>
       </div>
 
       {/* Primary Metric: Total Views */}

@@ -2,55 +2,57 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Youtube,
-  Instagram,
-  Facebook,
-  Linkedin,
-  Music2,
-  Twitter
-} from 'lucide-react';
 
 const navItems = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard },
-  { href: '/youtube', label: 'YouTube', icon: Youtube },
-  { href: '/instagram', label: 'Instagram', icon: Instagram },
-  { href: '/facebook', label: 'Facebook', icon: Facebook },
-  { href: '/tiktok', label: 'TikTok', icon: Music2 },
-  { href: '/x', label: 'X', icon: Twitter },
-  { href: '/linkedin', label: 'LinkedIn', icon: Linkedin },
+  { href: '/', label: 'Executive Overview', icon: '◆', color: '#e7ff01' },
+  { href: '/youtube', label: 'YouTube', icon: '▶', color: '#FF0000' },
+  { href: '/instagram', label: 'Instagram', icon: '◆', color: '#E4405F' },
+  { href: '/tiktok', label: 'TikTok', icon: '♪', color: '#00f2ea' },
+  { href: '/facebook', label: 'Facebook', icon: 'f', color: '#1877F2' },
+  { href: '/x', label: 'X (Twitter)', icon: '𝕏', color: '#ffffff' },
+  { href: '/linkedin', label: 'LinkedIn', icon: 'in', color: '#0A66C2' },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-brand-teal min-h-screen p-4 flex flex-col">
+    <aside className="w-64 bg-[#0d1117] min-h-screen p-4 flex flex-col border-r border-gray-800">
       {/* Logo */}
-      <div className="mb-8 p-4">
+      <div className="mb-8 px-2 pt-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="https://peoplesleaguegolf.com/wp-content/uploads/2024/08/PL-_-PRIMARY-LOGO-.png"
           alt="Peoples League"
-          className="w-44 h-auto mb-2"
+          className="w-32 h-auto mb-1"
         />
-        <p className="text-sm text-gray-400">Analytics Dashboard</p>
+        <p className="text-[10px] text-gray-500 uppercase tracking-widest">Analytics Platform</p>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {
-          const Icon = item.icon;
           const isActive = pathname === item.href;
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`sidebar-link ${isActive ? 'active' : 'text-gray-300'}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm ${
+                isActive
+                  ? 'bg-brand-lime/20 text-brand-lime border border-brand-lime/30'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+              }`}
             >
-              <Icon size={20} />
+              <span
+                className="w-5 h-5 rounded-full flex items-center justify-center text-xs border"
+                style={{
+                  borderColor: item.color,
+                  color: isActive ? item.color : '#6b7280'
+                }}
+              >
+                {item.icon}
+              </span>
               <span>{item.label}</span>
             </Link>
           );
@@ -58,8 +60,8 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="pt-4 border-t border-gray-700">
-        <p className="text-xs text-gray-500 text-center">
+      <div className="pt-4 mt-4 border-t border-gray-800">
+        <p className="text-[10px] text-gray-600 text-center">
           © 2026 Peoples League
         </p>
       </div>
