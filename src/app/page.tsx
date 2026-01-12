@@ -7,49 +7,42 @@ import { Youtube, Instagram, Facebook, Music2, Twitter, Linkedin, Eye, TrendingU
 
 export default function OverviewPage() {
   const [youtubeData, setYoutubeData] = useState<any>(null);
-  const [instagramStats, setInstagramStats] = useState<any>(null);
-  const [facebookStats, setFacebookStats] = useState<any>(null);
+  const [instagramData, setInstagramData] = useState<any>(null);
+  const [facebookData, setFacebookData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch YouTube data
-    fetch('/api/youtube')
-      .then(res => res.json())
-      .then(data => {
-        setYoutubeData(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-
-    // Load Instagram stats from localStorage
-    const igStats = localStorage.getItem('instagram_manual_stats');
-    if (igStats) {
-      setInstagramStats(JSON.parse(igStats).stats);
-    }
-
-    // Load Facebook stats from localStorage
-    const fbStats = localStorage.getItem('facebook_manual_stats');
-    if (fbStats) {
-      setFacebookStats(JSON.parse(fbStats).stats);
-    }
+    // Fetch all platform data in parallel
+    Promise.all([
+      fetch('/api/youtube').then(res => res.json()).catch(() => null),
+      fetch('/api/instagram').then(res => res.json()).catch(() => null),
+      fetch('/api/facebook').then(res => res.json()).catch(() => null),
+    ]).then(([youtube, instagram, facebook]) => {
+      setYoutubeData(youtube);
+      setInstagramData(instagram?.error ? null : instagram);
+      setFacebookData(facebook?.error ? null : facebook);
+      setLoading(false);
+    });
   }, []);
 
   // Calculate total views across platforms
   const youtubeViews = youtubeData?.viewCount || 0;
   const youtubeRecentViews = youtubeData?.recentVideos?.reduce((sum: number, v: any) => sum + v.viewCount, 0) || 0;
-  const instagramReelsViews = instagramStats?.reelsViews || 0;
-  const facebookVideoViews = facebookStats?.videoViews || 0;
+  const instagramReelsViews = instagramData?.reelsViews || 0;
+  const facebookVideoViews = facebookData?.videoViews || 0;
 
   const totalViews = youtubeViews + instagramReelsViews + facebookVideoViews;
   const recentViews = youtubeRecentViews + instagramReelsViews + facebookVideoViews;
+
+  // Count active platforms
+  const activePlatforms = [youtubeData, instagramData, facebookData].filter(Boolean).length;
 
   // Build views by platform for chart
   const viewsByPlatform = [
     { name: 'YouTube', value: youtubeRecentViews, color: '#FF0000' },
     { name: 'Instagram', value: instagramReelsViews, color: '#E4405F' },
     { name: 'Facebook', value: facebookVideoViews, color: '#1877F2' },
-    { name: 'TikTok', value: 0, color: '#00f2ea' },
-  ];
+  ].filter(p => p.value > 0);
 
   return (
     <div className="space-y-8">
@@ -66,7 +59,7 @@ export default function OverviewPage() {
           <h2 className="text-lg text-gray-300">Total Video Views</h2>
         </div>
         <div className="text-5xl font-bold text-brand-lime">
-          {totalViews.toLocaleString()}
+          {loading ? '...' : totalViews.toLocaleString()}
         </div>
         <p className="text-gray-400 mt-2">Lifetime views across all platforms</p>
       </div>
@@ -75,21 +68,21 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
           label="Recent Views"
-          value={recentViews.toLocaleString()}
+          value={loading ? '...' : recentViews.toLocaleString()}
           change="Last 30 days combined"
           changeType="neutral"
           icon={<TrendingUp size={20} />}
         />
         <MetricCard
           label="YouTube Lifetime"
-          value={youtubeViews.toLocaleString()}
+          value={loading ? '...' : youtubeViews.toLocaleString()}
           change={youtubeData ? "Live from API" : "Loading..."}
           changeType="positive"
           icon={<Youtube size={20} className="text-[#FF0000]" />}
         />
         <MetricCard
           label="Platforms Tracked"
-          value="3 of 6"
+          value={`${activePlatforms} of 6`}
           change="YouTube, Instagram, Facebook"
           changeType="neutral"
           icon={<Target size={20} />}
@@ -121,16 +114,19 @@ export default function OverviewPage() {
           <div className="flex items-center gap-2 mb-3">
             <Instagram className="text-[#E4405F]" size={24} />
             <span className="font-semibold">Instagram</span>
-            <span className={`text-xs ml-auto ${instagramStats ? 'text-green-400' : 'text-yellow-400'}`}>
-              {instagramStats ? 'Live' : 'Enter Stats'}
+            <span className={`text-xs ml-auto ${instagramData ? 'text-green-400' : 'text-yellow-400'}`}>
+              {instagramData ? 'Live' : 'Connecting...'}
             </span>
           </div>
           <div className="text-2xl font-bold">
             {instagramReelsViews ? instagramReelsViews.toLocaleString() : '--'}
           </div>
-          <p className="text-sm text-gray-400">Reels Views (30 days)</p>
-          {!instagramStats && (
-            <p className="text-xs text-yellow-400 mt-2">Update in Instagram page</p>
+          <p className="text-sm text-gray-400">Reels Views</p>
+          {instagramData && (
+            <div className="mt-2 pt-2 border-t border-gray-700">
+              <span className="text-sm text-gray-500">Followers: </span>
+              <span className="text-sm text-white">{instagramData.followers?.toLocaleString()}</span>
+            </div>
           )}
         </div>
 
@@ -139,16 +135,19 @@ export default function OverviewPage() {
           <div className="flex items-center gap-2 mb-3">
             <Facebook className="text-[#1877F2]" size={24} />
             <span className="font-semibold">Facebook</span>
-            <span className={`text-xs ml-auto ${facebookStats ? 'text-green-400' : 'text-yellow-400'}`}>
-              {facebookStats ? 'Live' : 'Enter Stats'}
+            <span className={`text-xs ml-auto ${facebookData ? 'text-green-400' : 'text-yellow-400'}`}>
+              {facebookData ? 'Live' : 'Connecting...'}
             </span>
           </div>
           <div className="text-2xl font-bold">
             {facebookVideoViews ? facebookVideoViews.toLocaleString() : '--'}
           </div>
           <p className="text-sm text-gray-400">Video Views (28 days)</p>
-          {!facebookStats && (
-            <p className="text-xs text-yellow-400 mt-2">Update in Facebook page</p>
+          {facebookData && (
+            <div className="mt-2 pt-2 border-t border-gray-700">
+              <span className="text-sm text-gray-500">Followers: </span>
+              <span className="text-sm text-white">{facebookData.followers?.toLocaleString()}</span>
+            </div>
           )}
         </div>
 
@@ -187,19 +186,16 @@ export default function OverviewPage() {
       </div>
 
       {/* Views Distribution Chart */}
-      <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4">Views Distribution by Platform</h3>
-        <SimpleChart
-          data={viewsByPlatform.filter(p => p.value > 0)}
-          color="#e7ff01"
-          type="bar"
-        />
-        {viewsByPlatform.every(p => p.value === 0) && (
-          <p className="text-center text-gray-400 py-8">
-            Enter your Instagram and Facebook stats to see the views breakdown
-          </p>
-        )}
-      </div>
+      {viewsByPlatform.length > 0 && (
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4">Views Distribution by Platform</h3>
+          <SimpleChart
+            data={viewsByPlatform}
+            color="#e7ff01"
+            type="bar"
+          />
+        </div>
+      )}
 
       {/* Secondary: Audience Size */}
       <div className="metric-card bg-gray-800/30">
@@ -212,12 +208,12 @@ export default function OverviewPage() {
           </div>
           <div>
             <Instagram className="text-[#E4405F] mx-auto mb-2" size={20} />
-            <div className="text-xl font-bold">9,900</div>
+            <div className="text-xl font-bold">{instagramData?.followers?.toLocaleString() || '--'}</div>
             <p className="text-xs text-gray-500">Followers</p>
           </div>
           <div>
             <Facebook className="text-[#1877F2] mx-auto mb-2" size={20} />
-            <div className="text-xl font-bold">695</div>
+            <div className="text-xl font-bold">{facebookData?.followers?.toLocaleString() || '--'}</div>
             <p className="text-xs text-gray-500">Followers</p>
           </div>
         </div>
