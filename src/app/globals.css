@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-lime: #e7ff01;
+  --brand-teal: #183539;
+  --brand-cyan: #52e3d4;
+}
+
+body {
+  background-color: #0f1419;
+  color: white;
+}
+
+.sidebar-link {
+  @apply flex items-center gap-3 px-4 py-3 rounded-lg transition-colors;
+}
+
+.sidebar-link:hover {
+  @apply bg-white/10;
+}
+
+.sidebar-link.active {
+  @apply bg-brand-lime text-brand-teal font-semibold;
+}
+
+.metric-card {
+  @apply bg-gray-800/50 rounded-xl p-6 border border-gray-700/50;
+}
+
+.platform-badge {
+  @apply inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium;
+}
