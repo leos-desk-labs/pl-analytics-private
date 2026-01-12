@@ -8,27 +8,10 @@ export async function GET() {
   }
 
   try {
-    // Get the Facebook Page
-    const pagesResponse = await fetch(
-      `https://graph.facebook.com/v24.0/me/accounts?access_token=${META_ACCESS_TOKEN}`
-    );
-    const pagesData = await pagesResponse.json();
-
-    if (pagesData.error) {
-      return NextResponse.json({ error: pagesData.error.message }, { status: 400 });
-    }
-
-    if (!pagesData.data || pagesData.data.length === 0) {
-      return NextResponse.json({ error: 'No Facebook Pages found' }, { status: 404 });
-    }
-
-    const page = pagesData.data[0];
-    const pageAccessToken = page.access_token;
-    const pageId = page.id;
-
+    // With a Page Access Token, "me" refers to the Page directly
     // Get Page info
     const pageInfoResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}?fields=id,name,followers_count,fan_count,link,picture&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/me?fields=id,name,followers_count,fan_count,link,picture&access_token=${META_ACCESS_TOKEN}`
     );
     const pageInfo = await pageInfoResponse.json();
 
@@ -36,9 +19,11 @@ export async function GET() {
       return NextResponse.json({ error: pageInfo.error.message }, { status: 400 });
     }
 
+    const pageId = pageInfo.id;
+
     // Get Page Insights (last 28 days) - using period=days_28
     const insightsResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_impressions,page_engaged_users,page_post_engagements,page_video_views,page_views_total&period=days_28&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_impressions,page_engaged_users,page_post_engagements,page_video_views,page_views_total&period=days_28&access_token=${META_ACCESS_TOKEN}`
     );
     const insightsData = await insightsResponse.json();
 
@@ -63,7 +48,7 @@ export async function GET() {
 
     // Get recent posts with engagement
     const postsResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,shares,likes.summary(true),comments.summary(true)&limit=25&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,shares,likes.summary(true),comments.summary(true)&limit=25&access_token=${META_ACCESS_TOKEN}`
     );
     const postsData = await postsResponse.json();
 
@@ -95,7 +80,7 @@ export async function GET() {
 
     // Get video posts specifically for video views
     const videosResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,length,views,likes.summary(true)&limit=25&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,length,views,likes.summary(true)&limit=25&access_token=${META_ACCESS_TOKEN}`
     );
     const videosData = await videosResponse.json();
 

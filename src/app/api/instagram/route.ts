@@ -8,27 +8,10 @@ export async function GET() {
   }
 
   try {
-    // First, get the Facebook Page ID and connected Instagram account
-    const pagesResponse = await fetch(
-      `https://graph.facebook.com/v24.0/me/accounts?access_token=${META_ACCESS_TOKEN}`
-    );
-    const pagesData = await pagesResponse.json();
-
-    if (pagesData.error) {
-      return NextResponse.json({ error: pagesData.error.message }, { status: 400 });
-    }
-
-    if (!pagesData.data || pagesData.data.length === 0) {
-      return NextResponse.json({ error: 'No Facebook Pages found' }, { status: 404 });
-    }
-
-    const page = pagesData.data[0];
-    const pageAccessToken = page.access_token;
-    const pageId = page.id;
-
+    // With a Page Access Token, "me" refers to the Page directly
     // Get Instagram Business Account connected to the Page
     const igAccountResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}?fields=instagram_business_account&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/me?fields=instagram_business_account&access_token=${META_ACCESS_TOKEN}`
     );
     const igAccountData = await igAccountResponse.json();
 
@@ -47,7 +30,7 @@ export async function GET() {
 
     // Get Instagram account info and metrics
     const igInfoResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${igAccountId}?fields=id,username,name,profile_picture_url,followers_count,follows_count,media_count&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/${igAccountId}?fields=id,username,name,profile_picture_url,followers_count,follows_count,media_count&access_token=${META_ACCESS_TOKEN}`
     );
     const igInfo = await igInfoResponse.json();
 
@@ -57,7 +40,7 @@ export async function GET() {
 
     // Get Instagram Insights (reach, impressions, etc.) - last 30 days
     const insightsResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${igAccountId}/insights?metric=reach,impressions,profile_views&period=day&since=${Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60}&until=${Math.floor(Date.now() / 1000)}&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/${igAccountId}/insights?metric=reach,impressions,profile_views&period=day&since=${Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60}&until=${Math.floor(Date.now() / 1000)}&access_token=${META_ACCESS_TOKEN}`
     );
     const insightsData = await insightsResponse.json();
 
@@ -77,7 +60,7 @@ export async function GET() {
 
     // Get recent media to calculate video views
     const mediaResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${igAccountId}/media?fields=id,media_type,like_count,comments_count,insights.metric(plays,reach,impressions)&limit=50&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/${igAccountId}/media?fields=id,media_type,like_count,comments_count,insights.metric(plays,reach,impressions)&limit=50&access_token=${META_ACCESS_TOKEN}`
     );
     const mediaData = await mediaResponse.json();
 
