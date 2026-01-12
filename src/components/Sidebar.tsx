@@ -1,5 +1,6 @@
 'use client';
 
+// Build: 2026-01-11 v2
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
