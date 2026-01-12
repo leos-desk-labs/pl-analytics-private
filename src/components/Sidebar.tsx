@@ -18,15 +18,15 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 bg-[#0d1117] min-h-screen p-4 flex flex-col border-r border-gray-800">
-      {/* Logo */}
-      <div className="mb-8 px-2 pt-4">
+      {/* Logo from Peoples League website */}
+      <div className="mb-6 px-2 pt-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="https://peoplesleaguegolf.com/wp-content/uploads/2024/08/PL-_-PRIMARY-LOGO-.png"
           alt="Peoples League"
-          className="w-32 h-auto mb-1"
+          className="w-36 h-auto mb-2"
         />
-        <p className="text-[10px] text-gray-500 uppercase tracking-widest">Analytics Platform</p>
+        <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em]">Analytics Platform</p>
       </div>
 
       {/* Navigation */}
