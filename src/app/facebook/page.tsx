@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
 import SimpleChart from '@/components/SimpleChart';
-import QuickStatsPanel from '@/components/QuickStatsPanel';
-import { Facebook, Users, Eye, Heart, MousePointer, Play, TrendingUp } from 'lucide-react';
+import UpdateStatsModal from '@/components/UpdateStatsModal';
+import { Facebook, Eye, Heart, TrendingUp, Users, Settings, Play } from 'lucide-react';
 
 const ACCOUNT_STATS = {
   followers: 695,
@@ -12,15 +12,14 @@ const ACCOUNT_STATS = {
 };
 
 const facebookFields = [
-  { key: 'videoViews', label: 'Video Views (Last 28 days)', help: 'Total video views - PRIMARY METRIC' },
-  { key: 'reach', label: 'Page Reach (Last 28 days)', help: 'From Meta Business Suite' },
-  { key: 'impressions', label: 'Impressions (Last 28 days)', help: 'Total content impressions' },
+  { key: 'videoViews', label: 'Video Views (Last 28 days)', help: 'Primary metric - total video views' },
+  { key: 'reach', label: 'Page Reach', help: 'Last 28 days' },
+  { key: 'impressions', label: 'Impressions', help: 'Last 28 days' },
   { key: 'engagement', label: 'Post Engagements', help: 'Reactions + comments + shares' },
-  { key: 'linkClicks', label: 'Link Clicks', help: 'Link clicks from posts' },
-  { key: 'followers', label: 'Page Followers', help: 'Current follower count' },
+  { key: 'linkClicks', label: 'Link Clicks' },
+  { key: 'followers', label: 'Followers' },
 ];
 
-// Demo data
 const generateDemoData = () => {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   return days.map(day => ({
@@ -31,31 +30,16 @@ const generateDemoData = () => {
 
 export default function FacebookPage() {
   const [savedStats, setSavedStats] = useState<Record<string, number> | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('facebook_manual_stats');
     if (saved) {
-      setSavedStats(JSON.parse(saved).stats);
+      const parsed = JSON.parse(saved);
+      setSavedStats(parsed.stats);
+      setLastUpdated(parsed.updated);
     }
-  }, []);
-
-  // Listen for storage changes
-  useEffect(() => {
-    const handleStorage = () => {
-      const saved = localStorage.getItem('facebook_manual_stats');
-      if (saved) {
-        setSavedStats(JSON.parse(saved).stats);
-      } else {
-        setSavedStats(null);
-      }
-    };
-
-    window.addEventListener('storage', handleStorage);
-    const interval = setInterval(handleStorage, 1000);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      clearInterval(interval);
-    };
   }, []);
 
   const followers = savedStats?.followers || ACCOUNT_STATS.followers;
@@ -68,27 +52,41 @@ export default function FacebookPage() {
   const hasRealData = savedStats !== null;
   const engagementRate = reach > 0 ? ((engagement / reach) * 100).toFixed(2) : '0.00';
 
+  const formatDate = (iso: string) => {
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric'
+    });
+  };
+
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <Facebook className="text-[#1877F2]" />
             Facebook Analytics
           </h1>
-          <p className="text-gray-400 mt-1">{ACCOUNT_STATS.pageName}</p>
+          <p className="text-gray-400 mt-1">
+            {ACCOUNT_STATS.pageName}
+            {hasRealData && lastUpdated && (
+              <span className="ml-2 text-gray-500">Updated {formatDate(lastUpdated)}</span>
+            )}
+          </p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm ${
-          hasRealData
-            ? 'bg-green-500/20 text-green-400'
-            : 'bg-yellow-500/20 text-yellow-400'
-        }`}>
-          {hasRealData ? 'Live Data' : 'Enter Stats Below'}
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-300 transition-colors"
+          >
+            <Settings size={16} />
+            Update Stats
+          </button>
+          <span className={`px-3 py-1 rounded-full text-sm ${hasRealData ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+            {hasRealData ? 'Live Data' : 'No Data'}
+          </span>
+        </div>
       </div>
 
-      {/* Primary Metric: Video Views */}
       <div className="metric-card bg-gradient-to-r from-[#1877F2]/20 to-gray-800 border-2 border-[#1877F2]">
         <div className="flex items-center gap-3 mb-2">
           <Play className="text-[#1877F2]" size={28} />
@@ -98,103 +96,57 @@ export default function FacebookPage() {
           {videoViews ? videoViews.toLocaleString() : '--'}
         </div>
         <p className="text-gray-400 mt-2">
-          {hasRealData ? 'Last 28 days from Meta Business Suite' : 'Enter your Video Views below'}
+          {hasRealData ? 'Last 28 days' : 'Click Update Stats to add data'}
         </p>
       </div>
 
-      {/* Quick Stats Panel */}
-      <QuickStatsPanel
-        platform="facebook"
-        fields={facebookFields}
-        defaultFollowers={ACCOUNT_STATS.followers}
-      />
-
-      {/* Views & Reach Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Video Views"
-          value={videoViews || '--'}
-          change={hasRealData ? "Last 28 days" : "Primary metric"}
-          changeType={hasRealData ? "positive" : "neutral"}
-          icon={<Play size={20} className="text-[#1877F2]" />}
-        />
-        <MetricCard
-          label="Page Reach"
-          value={reach || '--'}
-          change={hasRealData ? "Last 28 days" : "Enter above"}
-          changeType={hasRealData ? "positive" : "neutral"}
-          icon={<TrendingUp size={20} />}
-        />
-        <MetricCard
-          label="Impressions"
-          value={impressions || '--'}
-          change={hasRealData ? "Last 28 days" : "Enter above"}
-          changeType={hasRealData ? "positive" : "neutral"}
-          icon={<Eye size={20} />}
-        />
-        <MetricCard
-          label="Engagements"
-          value={engagement || '--'}
-          change={hasRealData ? "Last 28 days" : "Enter above"}
-          changeType={hasRealData ? "positive" : "neutral"}
-          icon={<Heart size={20} />}
-        />
+        <MetricCard label="Video Views" value={videoViews ? videoViews.toLocaleString() : '--'} change="Primary metric" changeType={hasRealData ? "positive" : "neutral"} icon={<Play size={20} className="text-[#1877F2]" />} />
+        <MetricCard label="Page Reach" value={reach ? reach.toLocaleString() : '--'} change="Last 28 days" changeType={hasRealData ? "positive" : "neutral"} icon={<TrendingUp size={20} />} />
+        <MetricCard label="Impressions" value={impressions ? impressions.toLocaleString() : '--'} change="Last 28 days" changeType={hasRealData ? "positive" : "neutral"} icon={<Eye size={20} />} />
+        <MetricCard label="Engagements" value={engagement ? engagement.toLocaleString() : '--'} change="Last 28 days" changeType={hasRealData ? "positive" : "neutral"} icon={<Heart size={20} />} />
       </div>
 
-      {/* Reach Chart */}
       <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4">
-          Weekly Reach {!hasRealData && <span className="text-yellow-400 text-sm">(Demo)</span>}
-        </h3>
+        <h3 className="text-lg font-semibold mb-4">Weekly Reach {!hasRealData && <span className="text-yellow-400 text-sm">(Demo)</span>}</h3>
         <SimpleChart data={generateDemoData()} color="#1877F2" />
       </div>
 
-      {/* Secondary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="metric-card">
           <h3 className="text-lg font-semibold mb-4">Link Clicks</h3>
-          <div className="text-4xl font-bold text-white">
-            {linkClicks ? linkClicks.toLocaleString() : '--'}
-          </div>
-          <p className="text-gray-400 mt-2">
-            {hasRealData ? 'Last 28 days' : 'Enter in Quick Stats panel'}
-          </p>
+          <div className="text-4xl font-bold text-white">{linkClicks ? linkClicks.toLocaleString() : '--'}</div>
+          <p className="text-gray-400 mt-2">Last 28 days</p>
         </div>
         <div className="metric-card bg-gray-800/30">
-          <h3 className="text-lg font-semibold mb-4 text-gray-400">Secondary: Followers</h3>
-          <div className="text-4xl font-bold text-white">
-            {followers.toLocaleString()}
+          <div className="flex items-center gap-2 mb-4">
+            <Users size={20} className="text-gray-400" />
+            <h3 className="text-lg font-semibold text-gray-400">Followers</h3>
           </div>
-          <p className="text-gray-400 mt-2">Current follower count</p>
+          <div className="text-4xl font-bold text-white">{followers.toLocaleString()}</div>
+          <p className="text-gray-400 mt-2">Secondary metric</p>
         </div>
       </div>
 
-      {/* Views Performance */}
       {hasRealData && videoViews > 0 && (
         <div className="metric-card">
           <h3 className="text-lg font-semibold mb-4">Views Performance</h3>
           <div className="grid grid-cols-2 gap-8">
             <div>
               <p className="text-gray-400 mb-1">Views per Follower</p>
-              <div className="text-3xl font-bold text-brand-lime">
-                {(videoViews / followers).toFixed(1)}x
-              </div>
-              <p className="text-sm text-gray-500 mt-1">
-                Your content reaches {(videoViews / followers).toFixed(1)}x your follower count
-              </p>
+              <div className="text-3xl font-bold text-brand-lime">{(videoViews / followers).toFixed(1)}x</div>
+              <p className="text-sm text-gray-500 mt-1">Content reaches {(videoViews / followers).toFixed(1)}x your follower count</p>
             </div>
             <div>
               <p className="text-gray-400 mb-1">Engagement Rate</p>
-              <div className="text-3xl font-bold text-brand-lime">
-                {engagementRate}%
-              </div>
-              <p className="text-sm text-gray-500 mt-1">
-                Engagements per account reached
-              </p>
+              <div className="text-3xl font-bold text-brand-lime">{engagementRate}%</div>
+              <p className="text-sm text-gray-500 mt-1">Engagements per account reached</p>
             </div>
           </div>
         </div>
       )}
+
+      <UpdateStatsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} platform="facebook" fields={facebookFields} defaultFollowers={ACCOUNT_STATS.followers} />
     </div>
   );
 }
