@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
 import SimpleChart from '@/components/SimpleChart';
-import { Youtube, Instagram, Facebook, Music2, Twitter, Linkedin, Eye, TrendingUp, Target } from 'lucide-react';
+import ViewsGrowthChart from '@/components/ViewsGrowthChart';
+import GrowthMetrics from '@/components/GrowthMetrics';
+import { Youtube, Instagram, Facebook, Music2, Twitter, Linkedin, Eye, TrendingUp, Target, Calendar } from 'lucide-react';
 
 export default function OverviewPage() {
   const [youtubeData, setYoutubeData] = useState<any>(null);
@@ -25,14 +27,27 @@ export default function OverviewPage() {
     });
   }, []);
 
-  // Calculate total views across platforms
-  const youtubeViews = youtubeData?.viewCount || 0;
+  // Calculate total views/impressions across ALL content on all platforms
+  // YouTube: lifetime views across all videos
+  const youtubeLifetimeViews = youtubeData?.viewCount || 0;
   const youtubeRecentViews = youtubeData?.recentVideos?.reduce((sum: number, v: any) => sum + v.viewCount, 0) || 0;
-  const instagramReelsViews = instagramData?.reelsViews || 0;
-  const facebookVideoViews = facebookData?.videoViews || 0;
 
-  const totalViews = youtubeViews + instagramReelsViews + facebookVideoViews;
-  const recentViews = youtubeRecentViews + instagramReelsViews + facebookVideoViews;
+  // Instagram: impressions if available, otherwise interactions as engagement proxy
+  const instagramImpressions = instagramData?.impressions || 0;
+  const instagramReelsViews = instagramData?.reelsViews || 0;
+  const instagramInteractions = instagramData?.interactions || 0;
+  const instagramMetric = instagramImpressions || instagramReelsViews || instagramInteractions;
+
+  // Facebook: impressions + video views
+  const facebookImpressions = facebookData?.impressions || 0;
+  const facebookVideoViews = facebookData?.videoViews || 0;
+  const facebookMetric = facebookImpressions + facebookVideoViews;
+
+  // Total views = all content views across all platforms
+  const totalViews = youtubeLifetimeViews + instagramMetric + facebookMetric;
+
+  // Recent period views (for charts and recent metrics)
+  const recentViews = youtubeRecentViews + instagramMetric + facebookVideoViews;
 
   // Count active platforms
   const activePlatforms = [youtubeData, instagramData, facebookData].filter(Boolean).length;
@@ -40,29 +55,88 @@ export default function OverviewPage() {
   // Build views by platform for chart
   const viewsByPlatform = [
     { name: 'YouTube', value: youtubeRecentViews, color: '#FF0000' },
-    { name: 'Instagram', value: instagramReelsViews, color: '#E4405F' },
-    { name: 'Facebook', value: facebookVideoViews, color: '#1877F2' },
+    { name: 'Instagram', value: instagramMetric, color: '#E4405F' },
+    { name: 'Facebook', value: facebookMetric, color: '#1877F2' },
   ].filter(p => p.value > 0);
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-4xl font-bold text-brand-lime">Executive Overview</h1>
+        <h1 className="text-4xl font-bold text-brand-lime">Overview</h1>
         <p className="text-gray-400 mt-1">Peoples League Media Network Performance</p>
       </div>
 
-      {/* Primary Metric: Total Views */}
-      <div className="metric-card bg-gradient-to-r from-brand-teal to-gray-800 border-2 border-brand-lime">
-        <div className="flex items-center gap-3 mb-2">
-          <Eye className="text-brand-lime" size={28} />
-          <h2 className="text-lg text-gray-300">Total Video Views</h2>
+      {/* Primary Metric: Total Views - Hero Display */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-brand-lime/30">
+        {/* Subtle background glow */}
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-brand-lime/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-brand-teal/10 rounded-full blur-3xl" />
+
+        <div className="relative p-8">
+          {/* Main number - centered hero */}
+          <div className="text-center mb-6">
+            <p className="text-gray-400 text-sm uppercase tracking-wider mb-3">Total Views</p>
+            <div className="text-6xl md:text-7xl font-bold text-brand-lime tracking-tight">
+              {loading ? '...' : totalViews.toLocaleString()}
+            </div>
+            <p className="text-gray-500 text-sm mt-2">across all platforms</p>
+          </div>
+
+          {/* Divider */}
+          <div className="w-24 h-px bg-gradient-to-r from-transparent via-brand-lime/50 to-transparent mx-auto mb-6" />
+
+          {/* 2026 Stats Row */}
+          <div className="flex items-center justify-center gap-8 md:gap-12 text-center">
+            <div>
+              <div className="text-2xl md:text-3xl font-bold text-white">
+                {loading ? '...' : recentViews.toLocaleString()}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">2026 YTD</p>
+            </div>
+            <div className="w-px h-10 bg-gray-700" />
+            <div>
+              <div className="text-2xl md:text-3xl font-bold text-white">
+                {loading ? '...' : (() => {
+                  const today = new Date();
+                  const startOfYear = new Date('2026-01-01');
+                  const daysElapsed = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                  return Math.round(recentViews / daysElapsed).toLocaleString();
+                })()}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">per day</p>
+            </div>
+            <div className="w-px h-10 bg-gray-700" />
+            <div>
+              <div className="text-2xl md:text-3xl font-bold text-white">
+                {activePlatforms}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">platforms</p>
+            </div>
+          </div>
         </div>
-        <div className="text-5xl font-bold text-brand-lime">
-          {loading ? '...' : totalViews.toLocaleString()}
-        </div>
-        <p className="text-gray-400 mt-2">Lifetime views across all platforms</p>
       </div>
+
+      {/* Views Growth Chart */}
+      {!loading && (
+        <ViewsGrowthChart
+          youtubeTotal={youtubeRecentViews}
+          instagramTotal={instagramMetric}
+          facebookTotal={facebookMetric}
+        />
+      )}
+
+      {/* Growth Metrics - MoM, Velocity, Milestones */}
+      {!loading && (
+        <GrowthMetrics
+          youtubeViews={youtubeRecentViews}
+          instagramViews={instagramMetric}
+          facebookViews={facebookMetric}
+          youtubeSubscribers={youtubeData?.subscriberCount || 0}
+          instagramFollowers={instagramData?.followers || 0}
+          facebookFollowers={facebookData?.followers || 0}
+        />
+      )}
 
       {/* Views Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -75,7 +149,7 @@ export default function OverviewPage() {
         />
         <MetricCard
           label="YouTube Lifetime"
-          value={loading ? '...' : youtubeViews.toLocaleString()}
+          value={loading ? '...' : youtubeLifetimeViews.toLocaleString()}
           change={youtubeData ? "Live from API" : "Loading..."}
           changeType="positive"
           icon={<Youtube size={20} className="text-[#FF0000]" />}
@@ -100,7 +174,7 @@ export default function OverviewPage() {
             {youtubeData && <span className="text-xs text-green-400 ml-auto">Live</span>}
           </div>
           <div className="text-2xl font-bold">
-            {loading ? '...' : youtubeViews.toLocaleString()}
+            {loading ? '...' : youtubeLifetimeViews.toLocaleString()}
           </div>
           <p className="text-sm text-gray-400">Lifetime Views</p>
           <div className="mt-2 pt-2 border-t border-gray-700">
@@ -119,9 +193,11 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="text-2xl font-bold">
-            {instagramReelsViews ? instagramReelsViews.toLocaleString() : '--'}
+            {instagramMetric ? instagramMetric.toLocaleString() : '--'}
           </div>
-          <p className="text-sm text-gray-400">Reels Views</p>
+          <p className="text-sm text-gray-400">
+            {instagramImpressions ? 'Impressions' : instagramReelsViews ? 'Reels Views' : 'Interactions'}
+          </p>
           {instagramData && (
             <div className="mt-2 pt-2 border-t border-gray-700">
               <span className="text-sm text-gray-500">Followers: </span>
@@ -140,9 +216,12 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="text-2xl font-bold">
-            {facebookVideoViews ? facebookVideoViews.toLocaleString() : '--'}
+            {facebookMetric ? facebookMetric.toLocaleString() : '--'}
           </div>
-          <p className="text-sm text-gray-400">Video Views (28 days)</p>
+          <p className="text-sm text-gray-400">
+            {facebookImpressions && facebookVideoViews ? 'Impressions + Video Views' :
+             facebookImpressions ? 'Impressions' : 'Video Views (28 days)'}
+          </p>
           {facebookData && (
             <div className="mt-2 pt-2 border-t border-gray-700">
               <span className="text-sm text-gray-500">Followers: </span>

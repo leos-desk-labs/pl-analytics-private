@@ -59,8 +59,9 @@ export async function GET() {
     }
 
     // Get recent media to calculate video views
+    // First try with insights, then fallback to basic fields
     const mediaResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${igAccountId}/media?fields=id,media_type,like_count,comments_count,insights.metric(plays,reach,impressions)&limit=50&access_token=${META_ACCESS_TOKEN}`
+      `https://graph.facebook.com/v24.0/${igAccountId}/media?fields=id,media_type,media_product_type,like_count,comments_count,plays_count,ig_reels_avg_watch_time,video_views&limit=50&access_token=${META_ACCESS_TOKEN}`
     );
     const mediaData = await mediaResponse.json();
 
@@ -73,13 +74,25 @@ export async function GET() {
         totalLikes += media.like_count || 0;
         totalComments += media.comments_count || 0;
 
-        // Get plays/views from video content (Reels)
-        if (media.insights?.data) {
-          media.insights.data.forEach((insight: any) => {
-            if (insight.name === 'plays') {
-              totalReelsViews += insight.values?.[0]?.value || 0;
-            }
-          });
+        // Get plays/views from different possible fields
+        // plays_count is for Reels, video_views for older videos
+        if (media.media_product_type === 'REELS' || media.media_type === 'VIDEO') {
+          totalReelsViews += media.plays_count || media.video_views || 0;
+        }
+      });
+    }
+
+    // Also try getting Reels-specific media
+    const reelsResponse = await fetch(
+      `https://graph.facebook.com/v24.0/${igAccountId}/media?fields=id,media_product_type,plays_count&limit=50&access_token=${META_ACCESS_TOKEN}`
+    );
+    const reelsData = await reelsResponse.json();
+
+    // Add any reels views we might have missed
+    if (reelsData.data && totalReelsViews === 0) {
+      reelsData.data.forEach((media: any) => {
+        if (media.plays_count) {
+          totalReelsViews += media.plays_count;
         }
       });
     }

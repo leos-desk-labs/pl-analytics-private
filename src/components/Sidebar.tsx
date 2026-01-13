@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
-  { href: '/', label: 'Executive Overview', icon: '◆', color: '#e7ff01' },
+  { href: '/', label: 'Overview', icon: '◆', color: '#e7ff01' },
+  { href: '/creators', label: 'Creator Hub', icon: '★', color: '#f472b6' },
+  { href: '/sponsors', label: 'Sponsor Hub', icon: '$', color: '#22c55e' },
   { href: '/youtube', label: 'YouTube', icon: '▶', color: '#FF0000' },
   { href: '/instagram', label: 'Instagram', icon: '◆', color: '#E4405F' },
   { href: '/tiktok', label: 'TikTok', icon: '♪', color: '#00f2ea' },
   { href: '/facebook', label: 'Facebook', icon: 'f', color: '#1877F2' },
-  { href: '/x', label: 'X (Twitter)', icon: '𝕏', color: '#ffffff' },
+  { href: '/x', label: 'X', icon: '𝕏', color: '#ffffff' },
   { href: '/linkedin', label: 'LinkedIn', icon: 'in', color: '#0A66C2' },
 ];
 

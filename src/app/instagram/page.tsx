@@ -107,26 +107,37 @@ export default function InstagramPage() {
         </span>
       </div>
 
-      {/* Primary Metric: Reels Views */}
+      {/* Primary Metric: Reels Views or Interactions */}
       <div className="metric-card bg-gradient-to-r from-[#E4405F]/20 to-gray-800 border-2 border-[#E4405F]">
         <div className="flex items-center gap-3 mb-2">
-          <Eye className="text-[#E4405F]" size={28} />
-          <h2 className="text-lg text-gray-300">Reels Views</h2>
+          {data?.reelsViews ? (
+            <>
+              <Eye className="text-[#E4405F]" size={28} />
+              <h2 className="text-lg text-gray-300">Reels Views</h2>
+            </>
+          ) : (
+            <>
+              <Heart className="text-[#E4405F]" size={28} />
+              <h2 className="text-lg text-gray-300">Total Interactions</h2>
+            </>
+          )}
         </div>
         <div className="text-5xl font-bold text-white">
-          {data?.reelsViews?.toLocaleString() || '0'}
+          {data?.reelsViews ? data.reelsViews.toLocaleString() : (data?.interactions?.toLocaleString() || '0')}
         </div>
-        <p className="text-gray-400 mt-2">From recent content</p>
+        <p className="text-gray-400 mt-2">
+          {data?.reelsViews ? 'From recent content' : 'Likes + Comments on all content'}
+        </p>
       </div>
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Reels Views"
-          value={data?.reelsViews?.toLocaleString() || '0'}
+          label={data?.reelsViews ? "Reels Views" : "Total Interactions"}
+          value={data?.reelsViews ? data.reelsViews.toLocaleString() : (data?.interactions?.toLocaleString() || '0')}
           change="Primary metric"
           changeType="positive"
-          icon={<Eye size={20} className="text-[#E4405F]" />}
+          icon={data?.reelsViews ? <Eye size={20} className="text-[#E4405F]" /> : <Heart size={20} className="text-[#E4405F]" />}
         />
         <MetricCard
           label="Accounts Reached"
