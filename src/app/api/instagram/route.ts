@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCached, setCache, getCacheInfo, getTimeUntilRefresh } from '@/lib/cache';
 
 // Force dynamic rendering for live data
 export const dynamic = 'force-dynamic';
@@ -6,6 +7,8 @@ export const revalidate = 0;
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_INSTAGRAM_ID = process.env.META_INSTAGRAM_ID;
+
+const CACHE_KEY = 'instagram_pl_data';
 
 interface MediaItem {
   id: string;
@@ -38,6 +41,20 @@ export async function GET() {
 
   if (!META_INSTAGRAM_ID) {
     return NextResponse.json({ error: 'META_INSTAGRAM_ID not configured' }, { status: 500 });
+  }
+
+  // Check for cached data (refreshes daily at 5am ET)
+  const cachedData = getCached<Record<string, unknown>>(CACHE_KEY);
+  if (cachedData) {
+    return NextResponse.json({
+      ...cachedData,
+      _meta: {
+        ...(cachedData._meta as Record<string, unknown>),
+        fromCache: true,
+        cacheInfo: getCacheInfo(),
+        nextRefresh: getTimeUntilRefresh(),
+      },
+    });
   }
 
   try {
@@ -164,7 +181,7 @@ export async function GET() {
     const totalWatchTimeHours = Math.round(totalWatchTimeMs / 1000 / 60 / 60);
     const avgWatchTimeSec = Math.round(avgWatchTimeMs / 1000);
 
-    return NextResponse.json({
+    const responseData = {
       // Account Overview
       account: {
         id: META_INSTAGRAM_ID,
@@ -231,8 +248,16 @@ export async function GET() {
         apiVersion: 'v18.0',
         reelsAnalyzed: allReelInsights.length,
         note: 'totalViews represents actual view count across all Reels',
+        fromCache: false,
+        cacheInfo: getCacheInfo(),
+        nextRefresh: getTimeUntilRefresh(),
       },
-    });
+    };
+
+    // Store in cache for next requests until 5am ET
+    setCache(CACHE_KEY, responseData);
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Instagram API error:', error);
     return NextResponse.json({ error: 'Failed to fetch Instagram data' }, { status: 500 });

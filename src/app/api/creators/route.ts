@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { creators } from '@/data/creators';
+import { getCached, setCache, getCacheInfo, getTimeUntilRefresh, isCacheValid } from '@/lib/cache';
 
 // Force dynamic rendering for live data
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,8 @@ export const revalidate = 0;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_INSTAGRAM_ID = process.env.META_INSTAGRAM_ID;
+
+const CREATORS_CACHE_KEY = 'creators_data';
 
 // ============================================================================
 // YOUTUBE CHANNEL IDS - Required for accurate API lookups
@@ -54,7 +57,8 @@ const youtubeChannelIds: Record<string, string> = {
 };
 
 // ============================================================================
-// CACHING - Reduce API calls and improve performance
+// CACHING - Uses daily 5am ET refresh (imported from @/lib/cache)
+// Individual API results also cached to avoid redundant calls within same window
 // ============================================================================
 interface CacheEntry<T> {
   data: T;
@@ -62,7 +66,7 @@ interface CacheEntry<T> {
 }
 
 const youtubeDataCache = new Map<string, CacheEntry<YouTubeChannelData>>();
-const CACHE_TTL = 1000 * 60 * 60; // 1 hour cache for live data
+// Note: Now using daily cache from lib/cache.ts instead of hourly TTL
 
 interface YouTubeChannelData {
   subscriberCount: number;
@@ -89,9 +93,9 @@ async function getYouTubeChannelData(handle: string): Promise<YouTubeChannelData
     return null;
   }
 
-  // Check cache first
+  // Check cache first (uses daily 5am ET refresh)
   const cached = youtubeDataCache.get(handle);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  if (cached && isCacheValid(`youtube_${handle}`)) {
     return cached.data;
   }
 
@@ -167,8 +171,9 @@ async function getYouTubeChannelData(handle: string): Promise<YouTubeChannelData
         title: channel.snippet.title,
       };
 
-      // Cache the result
+      // Cache the result (with timestamp for daily validation)
       youtubeDataCache.set(handle, { data, timestamp: Date.now() });
+      setCache(`youtube_${handle}`, data);
 
       return data;
     }
@@ -189,9 +194,9 @@ async function getInstagramData(handle: string): Promise<InstagramData | null> {
     return null;
   }
 
-  // Check cache first
+  // Check cache first (uses daily 5am ET refresh)
   const cached = instagramDataCache.get(handle);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  if (cached && isCacheValid(`instagram_${handle}`)) {
     return cached.data;
   }
 
@@ -215,8 +220,9 @@ async function getInstagramData(handle: string): Promise<InstagramData | null> {
         username: data.business_discovery.username || handle,
       };
 
-      // Cache the result
+      // Cache the result (with timestamp for daily validation)
       instagramDataCache.set(handle, { data: instagramData, timestamp: Date.now() });
+      setCache(`instagram_${handle}`, instagramData);
 
       return instagramData;
     }
@@ -266,6 +272,20 @@ const fallbackProfilePictures: Record<string, string> = {
 // MAIN API ENDPOINT
 // ============================================================================
 export async function GET() {
+  // Check for cached full response (refreshes daily at 5am ET)
+  const cachedData = getCached<Record<string, unknown>>(CREATORS_CACHE_KEY);
+  if (cachedData) {
+    return NextResponse.json({
+      ...cachedData,
+      _meta: {
+        ...(cachedData._meta as Record<string, unknown>),
+        fromCache: true,
+        cacheInfo: getCacheInfo(),
+        nextRefresh: getTimeUntilRefresh(),
+      },
+    });
+  }
+
   try {
     const now = new Date().toISOString();
 
@@ -350,20 +370,27 @@ export async function GET() {
       },
     };
 
-    return NextResponse.json({
+    const responseData = {
       creators: creatorsWithData,
       networkStats,
       _meta: {
         generatedAt: now,
-        cacheExpiry: new Date(Date.now() + CACHE_TTL).toISOString(),
         apiStatus: {
           youtube: YOUTUBE_API_KEY ? 'connected' : 'not configured',
           instagram: META_ACCESS_TOKEN ? 'connected' : 'not configured',
           tiktok: 'pending configuration',
           x: 'pending configuration',
         },
+        fromCache: false,
+        cacheInfo: getCacheInfo(),
+        nextRefresh: getTimeUntilRefresh(),
       },
-    });
+    };
+
+    // Store in cache for next requests until 5am ET
+    setCache(CREATORS_CACHE_KEY, responseData);
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Creators API error:', error);
     return NextResponse.json({ error: 'Failed to fetch creator data' }, { status: 500 });
