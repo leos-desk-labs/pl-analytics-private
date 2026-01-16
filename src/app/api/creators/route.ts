@@ -6,6 +6,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+const META_INSTAGRAM_ID = process.env.META_INSTAGRAM_ID;
 
 // ============================================================================
 // YOUTUBE CHANNEL IDS - Required for accurate API lookups
@@ -70,6 +72,14 @@ interface YouTubeChannelData {
   title: string;
 }
 
+interface InstagramData {
+  followersCount: number;
+  mediaCount: number;
+  username: string;
+}
+
+const instagramDataCache = new Map<string, CacheEntry<InstagramData>>();
+
 // ============================================================================
 // YOUTUBE API - Fetch LIVE subscriber counts and channel data
 // ============================================================================
@@ -90,7 +100,7 @@ async function getYouTubeChannelData(handle: string): Promise<YouTubeChannelData
   try {
     let targetChannelId = channelId;
 
-    // If we don't have the channel ID, try to find it by handle
+    // If we don't have the channel ID, or if the ID didn't return results, try by handle
     if (!targetChannelId) {
       // Try the newer handle-based lookup first
       const handleResponse = await fetch(
@@ -108,7 +118,28 @@ async function getYouTubeChannelData(handle: string): Promise<YouTubeChannelData
         const searchData = await searchResponse.json();
 
         if (searchData.items && searchData.items.length > 0) {
-          targetChannelId = searchData.items[0].snippet.channelId;
+          targetChannelId = searchData.items[0].id.channelId;
+        }
+      }
+    } else {
+      // Verify the channel ID returns results, otherwise search by handle
+      const verifyResponse = await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?part=id&id=${targetChannelId}&key=${YOUTUBE_API_KEY}`
+      );
+      const verifyData = await verifyResponse.json();
+
+      if (!verifyData.items || verifyData.items.length === 0) {
+        // Stored channel ID is invalid, try search instead
+        console.log(`Channel ID ${targetChannelId} invalid for ${handle}, searching...`);
+        targetChannelId = null;
+
+        const searchResponse = await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${YOUTUBE_API_KEY}`
+        );
+        const searchData = await searchResponse.json();
+
+        if (searchData.items && searchData.items.length > 0) {
+          targetChannelId = searchData.items[0].id.channelId;
         }
       }
     }
@@ -143,6 +174,54 @@ async function getYouTubeChannelData(handle: string): Promise<YouTubeChannelData
     }
   } catch (error) {
     console.error(`Failed to fetch YouTube data for ${handle}:`, error);
+  }
+
+  return null;
+}
+
+// ============================================================================
+// INSTAGRAM BUSINESS DISCOVERY API - Fetch LIVE follower counts
+// Uses Meta's Business Discovery API to get public Instagram data
+// ============================================================================
+async function getInstagramData(handle: string): Promise<InstagramData | null> {
+  if (!META_ACCESS_TOKEN || !META_INSTAGRAM_ID) {
+    console.warn('Meta API credentials not configured');
+    return null;
+  }
+
+  // Check cache first
+  const cached = instagramDataCache.get(handle);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  try {
+    // Business Discovery API - works for any public business/creator account
+    const url = `https://graph.facebook.com/v18.0/${META_INSTAGRAM_ID}?fields=business_discovery.username(${encodeURIComponent(handle)})%7Bfollowers_count,media_count,username%7D&access_token=${META_ACCESS_TOKEN}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.error) {
+      // Handle case where account doesn't exist or isn't a business account
+      console.warn(`Instagram API error for ${handle}:`, data.error.message);
+      return null;
+    }
+
+    if (data.business_discovery) {
+      const instagramData: InstagramData = {
+        followersCount: data.business_discovery.followers_count || 0,
+        mediaCount: data.business_discovery.media_count || 0,
+        username: data.business_discovery.username || handle,
+      };
+
+      // Cache the result
+      instagramDataCache.set(handle, { data: instagramData, timestamp: Date.now() });
+
+      return instagramData;
+    }
+  } catch (error) {
+    console.error(`Failed to fetch Instagram data for ${handle}:`, error);
   }
 
   return null;
@@ -201,19 +280,28 @@ export async function GET() {
         youtubeData = await getYouTubeChannelData(ytHandle);
       }
 
-      // Build followers object with live YouTube data
-      // Other platforms will show 0 until their APIs are connected
+      // Fetch live Instagram data if available
+      let instagramData: InstagramData | null = null;
+      if (igHandle) {
+        instagramData = await getInstagramData(igHandle);
+      }
+
+      // Calculate total from live data sources
+      const youtubeFollowers = youtubeData?.subscriberCount || 0;
+      const instagramFollowers = instagramData?.followersCount || 0;
+
+      // Build followers object with live data
       const followers = {
-        youtube: youtubeData?.subscriberCount || 0,
-        instagram: 0, // TODO: Connect Meta API
+        youtube: youtubeFollowers,
+        instagram: instagramFollowers,
         tiktok: 0,    // TODO: Connect TikTok API
-        facebook: 0,  // TODO: Connect Meta API
+        facebook: 0,  // TODO: Connect Meta API for Facebook
         x: 0,         // TODO: Connect X API
-        total: youtubeData?.subscriberCount || 0,
+        total: youtubeFollowers + instagramFollowers,
         lastUpdated: now,
         dataSource: {
           youtube: youtubeData ? 'live' : 'unavailable',
-          instagram: 'pending',
+          instagram: instagramData ? 'live' : (igHandle ? 'unavailable' : 'no_handle'),
           tiktok: 'pending',
           facebook: 'pending',
           x: 'pending',
@@ -234,6 +322,10 @@ export async function GET() {
           videoCount: youtubeData.videoCount,
           channelTitle: youtubeData.title,
         } : null,
+        instagramStats: instagramData ? {
+          mediaCount: instagramData.mediaCount,
+          username: instagramData.username,
+        } : null,
       };
     }));
 
@@ -251,9 +343,9 @@ export async function GET() {
       lastUpdated: now,
       dataSources: {
         youtube: 'live',
-        instagram: 'pending - Meta API token needed',
+        instagram: 'live',
         tiktok: 'pending - TikTok Business API credentials needed',
-        facebook: 'pending - Meta API token needed',
+        facebook: 'pending - separate Facebook integration needed',
         x: 'pending - X API subscription needed',
       },
     };
@@ -266,7 +358,7 @@ export async function GET() {
         cacheExpiry: new Date(Date.now() + CACHE_TTL).toISOString(),
         apiStatus: {
           youtube: YOUTUBE_API_KEY ? 'connected' : 'not configured',
-          meta: 'pending configuration',
+          instagram: META_ACCESS_TOKEN ? 'connected' : 'not configured',
           tiktok: 'pending configuration',
           x: 'pending configuration',
         },
