@@ -17,10 +17,17 @@ interface MediaItem {
   permalink: string;
 }
 
-interface MediaWithInsights extends MediaItem {
+interface ReelInsights {
+  views: number;
   reach: number;
   shares: number;
   saved: number;
+  totalWatchTimeMs: number;
+  avgWatchTimeMs: number;
+}
+
+interface MediaWithInsights extends MediaItem {
+  insights: ReelInsights;
   engagementRate: number;
 }
 
@@ -54,7 +61,7 @@ export async function GET() {
     const accountsEngaged = engagementData.data?.find((m: { name: string }) => m.name === 'accounts_engaged')?.total_value?.value || 0;
     const totalInteractions = engagementData.data?.find((m: { name: string }) => m.name === 'total_interactions')?.total_value?.value || 0;
 
-    // 3. Get ALL media (basic fields only - fast pagination)
+    // 3. Get ALL media with pagination (basic fields only - fast)
     const allMedia: MediaItem[] = [];
     let nextUrl: string | null = `https://graph.facebook.com/v18.0/${META_INSTAGRAM_ID}/media?fields=id,media_type,like_count,comments_count,caption,timestamp,permalink&limit=100&access_token=${META_ACCESS_TOKEN}`;
 
@@ -72,61 +79,72 @@ export async function GET() {
     const images = allMedia.filter(m => m.media_type === 'IMAGE');
     const carousels = allMedia.filter(m => m.media_type === 'CAROUSEL_ALBUM');
 
-    // 5. Calculate totals
+    // 5. Calculate totals from basic fields
     const totalLikes = allMedia.reduce((sum, m) => sum + (m.like_count || 0), 0);
     const totalComments = allMedia.reduce((sum, m) => sum + (m.comments_count || 0), 0);
 
-    // 6. Get detailed insights for top 10 and bottom 5 performing reels
-    // Sort by engagement (likes + comments)
-    const sortedReels = [...reels].sort((a, b) =>
-      (b.like_count + b.comments_count) - (a.like_count + a.comments_count)
-    );
+    // 6. Fetch insights for ALL reels (views, reach, shares, saves, watch time)
+    // Process in batches of 10 to avoid rate limits
+    const batchSize = 10;
+    const allReelInsights: MediaWithInsights[] = [];
 
-    const topReels = sortedReels.slice(0, 10);
-    const bottomReels = sortedReels.slice(-5).reverse();
+    for (let i = 0; i < reels.length; i += batchSize) {
+      const batch = reels.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (media): Promise<MediaWithInsights> => {
+          try {
+            const insightsResponse = await fetch(
+              `https://graph.facebook.com/v18.0/${media.id}/insights?metric=views,reach,shares,saved,ig_reels_video_view_total_time,ig_reels_avg_watch_time&access_token=${META_ACCESS_TOKEN}`
+            );
+            const insights = await insightsResponse.json();
 
-    // Fetch insights for these reels in parallel
-    async function getReelInsights(media: MediaItem): Promise<MediaWithInsights> {
-      try {
-        const insightsResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${media.id}/insights?metric=reach,shares,saved&access_token=${META_ACCESS_TOKEN}`
-        );
-        const insights = await insightsResponse.json();
+            const getMetricValue = (name: string) =>
+              insights.data?.find((i: { name: string }) => i.name === name)?.values?.[0]?.value || 0;
 
-        const reach = insights.data?.find((i: { name: string }) => i.name === 'reach')?.values?.[0]?.value || 0;
-        const shares = insights.data?.find((i: { name: string }) => i.name === 'shares')?.values?.[0]?.value || 0;
-        const saved = insights.data?.find((i: { name: string }) => i.name === 'saved')?.values?.[0]?.value || 0;
+            const reelInsights: ReelInsights = {
+              views: getMetricValue('views'),
+              reach: getMetricValue('reach'),
+              shares: getMetricValue('shares'),
+              saved: getMetricValue('saved'),
+              totalWatchTimeMs: getMetricValue('ig_reels_video_view_total_time'),
+              avgWatchTimeMs: getMetricValue('ig_reels_avg_watch_time'),
+            };
 
-        return {
-          ...media,
-          reach,
-          shares,
-          saved,
-          engagementRate: reach > 0 ? ((media.like_count + media.comments_count + shares + saved) / reach * 100) : 0,
-        };
-      } catch {
-        return {
-          ...media,
-          reach: 0,
-          shares: 0,
-          saved: 0,
-          engagementRate: 0,
-        };
-      }
+            return {
+              ...media,
+              insights: reelInsights,
+              engagementRate: reelInsights.reach > 0
+                ? ((media.like_count + media.comments_count + reelInsights.shares + reelInsights.saved) / reelInsights.reach * 100)
+                : 0,
+            };
+          } catch {
+            return {
+              ...media,
+              insights: { views: 0, reach: 0, shares: 0, saved: 0, totalWatchTimeMs: 0, avgWatchTimeMs: 0 },
+              engagementRate: 0,
+            };
+          }
+        })
+      );
+      allReelInsights.push(...batchResults);
     }
 
-    const [topReelsWithInsights, bottomReelsWithInsights] = await Promise.all([
-      Promise.all(topReels.map(getReelInsights)),
-      Promise.all(bottomReels.map(getReelInsights)),
-    ]);
-
-    // 7. Calculate aggregate reel stats from top performers
-    const topReelsTotalReach = topReelsWithInsights.reduce((sum, r) => sum + r.reach, 0);
-    const avgEngagementRate = topReelsWithInsights.length > 0
-      ? topReelsWithInsights.reduce((sum, r) => sum + r.engagementRate, 0) / topReelsWithInsights.length
+    // 7. Calculate aggregate stats from ALL reels
+    const totalReelViews = allReelInsights.reduce((sum, r) => sum + r.insights.views, 0);
+    const totalReelReach = allReelInsights.reduce((sum, r) => sum + r.insights.reach, 0);
+    const totalShares = allReelInsights.reduce((sum, r) => sum + r.insights.shares, 0);
+    const totalSaves = allReelInsights.reduce((sum, r) => sum + r.insights.saved, 0);
+    const totalWatchTimeMs = allReelInsights.reduce((sum, r) => sum + r.insights.totalWatchTimeMs, 0);
+    const avgWatchTimeMs = allReelInsights.length > 0
+      ? allReelInsights.reduce((sum, r) => sum + r.insights.avgWatchTimeMs, 0) / allReelInsights.length
       : 0;
 
-    // 8. Format for response
+    // 8. Sort and get top/bottom performers
+    const sortedByViews = [...allReelInsights].sort((a, b) => b.insights.views - a.insights.views);
+    const topPerformers = sortedByViews.slice(0, 10);
+    const bottomPerformers = sortedByViews.slice(-5).reverse();
+
+    // 9. Format response
     const formatReel = (r: MediaWithInsights) => ({
       id: r.id,
       caption: r.caption?.slice(0, 100) || '',
@@ -134,11 +152,17 @@ export async function GET() {
       permalink: r.permalink,
       likes: r.like_count,
       comments: r.comments_count,
-      reach: r.reach,
-      shares: r.shares,
-      saved: r.saved,
+      views: r.insights.views,
+      reach: r.insights.reach,
+      shares: r.insights.shares,
+      saved: r.insights.saved,
+      avgWatchTimeSec: Math.round(r.insights.avgWatchTimeMs / 1000),
       engagementRate: r.engagementRate.toFixed(2) + '%',
     });
+
+    // Convert watch time to readable format
+    const totalWatchTimeHours = Math.round(totalWatchTimeMs / 1000 / 60 / 60);
+    const avgWatchTimeSec = Math.round(avgWatchTimeMs / 1000);
 
     return NextResponse.json({
       // Account Overview
@@ -167,10 +191,19 @@ export async function GET() {
         carousels: carousels.length,
       },
 
+      // *** KEY METRICS FOR TOTAL VIEWS ***
+      totalViews: {
+        reels: totalReelViews,
+        // Images and carousels don't have views in the same way
+        allContent: totalReelViews, // For now, total views = reel views
+      },
+
       // Aggregate Stats (All Content)
       allTimeStats: {
         totalLikes: totalLikes,
         totalComments: totalComments,
+        totalShares: totalShares,
+        totalSaves: totalSaves,
         avgLikesPerPost: Math.round(totalLikes / allMedia.length),
         avgCommentsPerPost: Math.round(totalComments / allMedia.length),
       },
@@ -178,17 +211,26 @@ export async function GET() {
       // Reels Performance
       reelsPerformance: {
         totalReels: reels.length,
-        topReelsReach: topReelsTotalReach,
-        avgEngagementRate: avgEngagementRate.toFixed(2) + '%',
-        bestPerformers: topReelsWithInsights.map(formatReel),
-        needsImprovement: bottomReelsWithInsights.map(formatReel),
+        totalViews: totalReelViews,
+        totalReach: totalReelReach,
+        totalShares: totalShares,
+        totalSaves: totalSaves,
+        totalWatchTimeHours: totalWatchTimeHours,
+        avgWatchTimeSec: avgWatchTimeSec,
+        avgViewsPerReel: Math.round(totalReelViews / reels.length),
+        avgEngagementRate: allReelInsights.length > 0
+          ? (allReelInsights.reduce((sum, r) => sum + r.engagementRate, 0) / allReelInsights.length).toFixed(2) + '%'
+          : '0%',
+        bestPerformers: topPerformers.map(formatReel),
+        needsImprovement: bottomPerformers.map(formatReel),
       },
 
       // Metadata
       _meta: {
         generatedAt: new Date().toISOString(),
         apiVersion: 'v18.0',
-        mediaAnalyzed: allMedia.length,
+        reelsAnalyzed: allReelInsights.length,
+        note: 'totalViews represents actual view count across all Reels',
       },
     });
   } catch (error) {
