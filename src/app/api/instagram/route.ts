@@ -65,13 +65,13 @@ export async function GET() {
     const allMedia: MediaItem[] = [];
     let nextUrl: string | null = `https://graph.facebook.com/v18.0/${META_INSTAGRAM_ID}/media?fields=id,media_type,like_count,comments_count,caption,timestamp,permalink&limit=100&access_token=${META_ACCESS_TOKEN}`;
 
-    while (nextUrl && allMedia.length < 500) {
-      const mediaResponse = await fetch(nextUrl);
+    while (nextUrl !== null && allMedia.length < 500) {
+      const mediaResponse: Response = await fetch(nextUrl);
       const mediaData = await mediaResponse.json();
       if (mediaData.data) {
         allMedia.push(...mediaData.data);
       }
-      nextUrl = mediaData.paging?.next || null;
+      nextUrl = mediaData.paging?.next ?? null;
     }
 
     // 4. Calculate content breakdown

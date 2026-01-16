@@ -98,7 +98,7 @@ async function getYouTubeChannelData(handle: string): Promise<YouTubeChannelData
   const channelId = youtubeChannelIds[handle];
 
   try {
-    let targetChannelId = channelId;
+    let targetChannelId: string | null = channelId;
 
     // If we don't have the channel ID, or if the ID didn't return results, try by handle
     if (!targetChannelId) {
