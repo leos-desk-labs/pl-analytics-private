@@ -44,10 +44,21 @@ async function getChannelStats(channelId: string) {
   }
 }
 
+// Parse ISO 8601 duration (PT1H2M3S) to seconds
+function parseDuration(duration: string): number {
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[1] || '0');
+  const minutes = parseInt(match[2] || '0');
+  const seconds = parseInt(match[3] || '0');
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
 async function getRecentVideos(channelId: string) {
   if (!YOUTUBE_API_KEY) return [];
 
-  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=id&channelId=${channelId}&order=date&type=video&maxResults=10&key=${YOUTUBE_API_KEY}`;
+  // Fetch more videos (50) to ensure we capture all recent content including the championship videos
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=id&channelId=${channelId}&order=date&type=video&maxResults=50&key=${YOUTUBE_API_KEY}`;
 
   try {
     const searchRes = await fetch(searchUrl, { next: { revalidate: 3600 } });
@@ -56,19 +67,29 @@ async function getRecentVideos(channelId: string) {
     const videoIds = searchData.items?.map((item: any) => item.id?.videoId).filter(Boolean).join(',');
     if (!videoIds) return [];
 
-    const videosUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`;
+    // Include contentDetails to get duration for Shorts vs Long-form classification
+    const videosUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoIds}&key=${YOUTUBE_API_KEY}`;
     const videosRes = await fetch(videosUrl, { next: { revalidate: 3600 } });
     const videosData = await videosRes.json();
 
-    return videosData.items?.map((video: any) => ({
-      id: video.id,
-      title: video.snippet?.title,
-      thumbnail: video.snippet?.thumbnails?.medium?.url,
-      publishedAt: video.snippet?.publishedAt,
-      viewCount: parseInt(video.statistics?.viewCount || '0'),
-      likeCount: parseInt(video.statistics?.likeCount || '0'),
-      commentCount: parseInt(video.statistics?.commentCount || '0'),
-    })) || [];
+    return videosData.items?.map((video: any) => {
+      const durationSeconds = parseDuration(video.contentDetails?.duration || 'PT0S');
+      const isShort = durationSeconds <= 60;
+
+      return {
+        id: video.id,
+        title: video.snippet?.title,
+        thumbnail: video.snippet?.thumbnails?.medium?.url,
+        publishedAt: video.snippet?.publishedAt,
+        viewCount: parseInt(video.statistics?.viewCount || '0'),
+        likeCount: parseInt(video.statistics?.likeCount || '0'),
+        commentCount: parseInt(video.statistics?.commentCount || '0'),
+        duration: video.contentDetails?.duration,
+        durationSeconds,
+        isShort,
+        videoType: isShort ? 'short' : 'long',
+      };
+    }) || [];
   } catch {
     return [];
   }

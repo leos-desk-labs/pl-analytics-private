@@ -13,6 +13,10 @@ interface Video {
   viewCount: number;
   likeCount: number;
   commentCount: number;
+  duration?: string;
+  durationSeconds?: number;
+  isShort?: boolean;
+  videoType?: 'short' | 'long';
 }
 
 interface YouTubeData {
@@ -26,6 +30,17 @@ interface YouTubeData {
     generatedAt: string;
     source: string;
   };
+}
+
+// Helper to format duration
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins < 60) return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const hours = Math.floor(mins / 60);
+  const remainingMins = mins % 60;
+  return `${hours}:${remainingMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
 export default function YouTubePage() {
@@ -75,16 +90,32 @@ export default function YouTubePage() {
     );
   }
 
-  // Generate chart data from recent videos
-  const chartData = data?.recentVideos?.slice(0, 7).reverse().map((video, i) => ({
-    name: `Vid ${i + 1}`,
-    value: video.viewCount
-  })) || [];
+  // Separate Long-form videos and Shorts
+  const longFormVideos = data?.recentVideos?.filter(v => !v.isShort) || [];
+  const shortsVideos = data?.recentVideos?.filter(v => v.isShort) || [];
 
+  // Long-form stats
+  const longFormViews = longFormVideos.reduce((sum, v) => sum + v.viewCount, 0);
+  const longFormLikes = longFormVideos.reduce((sum, v) => sum + v.likeCount, 0);
+  const longFormComments = longFormVideos.reduce((sum, v) => sum + v.commentCount, 0);
+  const avgLongFormViews = longFormVideos.length ? Math.round(longFormViews / longFormVideos.length) : 0;
+
+  // Shorts stats
+  const shortsViews = shortsVideos.reduce((sum, v) => sum + v.viewCount, 0);
+  const shortsLikes = shortsVideos.reduce((sum, v) => sum + v.likeCount, 0);
+  const shortsComments = shortsVideos.reduce((sum, v) => sum + v.commentCount, 0);
+  const avgShortsViews = shortsVideos.length ? Math.round(shortsViews / shortsVideos.length) : 0;
+
+  // Total stats (all videos)
   const totalVideoViews = data?.recentVideos?.reduce((sum, v) => sum + v.viewCount, 0) || 0;
   const totalLikes = data?.recentVideos?.reduce((sum, v) => sum + v.likeCount, 0) || 0;
   const totalComments = data?.recentVideos?.reduce((sum, v) => sum + v.commentCount, 0) || 0;
-  const avgViewsPerVideo = data?.recentVideos?.length ? Math.round(totalVideoViews / data.recentVideos.length) : 0;
+
+  // Chart data for long-form videos
+  const longFormChartData = longFormVideos.slice(0, 10).map((video, i) => ({
+    name: `#${i + 1}`,
+    value: video.viewCount
+  }));
 
   return (
     <div className="space-y-8">
@@ -126,21 +157,14 @@ export default function YouTubePage() {
         <p className="text-gray-400 mt-2">Lifetime channel views</p>
       </div>
 
-      {/* Views Metrics */}
+      {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Recent Video Views"
+          label="Total Recent Views"
           value={totalVideoViews}
-          change="Last 10 videos"
+          change={`${data?.recentVideos?.length || 0} videos analyzed`}
           changeType="positive"
           icon={<Eye size={20} className="text-[#FF0000]" />}
-        />
-        <MetricCard
-          label="Avg Views/Video"
-          value={avgViewsPerVideo}
-          change="Recent average"
-          changeType="neutral"
-          icon={<TrendingUp size={20} />}
         />
         <MetricCard
           label="Videos Published"
@@ -152,58 +176,113 @@ export default function YouTubePage() {
         <MetricCard
           label="Subscribers"
           value={data?.subscriberCount || 0}
-          change="Secondary metric"
+          change="Current"
           changeType="neutral"
           icon={<Users size={20} />}
         />
+        <MetricCard
+          label="Engagement Rate"
+          value={`${totalVideoViews > 0 ? ((totalLikes / totalVideoViews) * 100).toFixed(1) : 0}%`}
+          change="Likes per 100 views"
+          changeType="neutral"
+          icon={<TrendingUp size={20} />}
+        />
       </div>
 
-      {/* Views Chart */}
-      <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4">Views by Recent Video</h3>
-        <SimpleChart data={chartData} color="#FF0000" type="bar" />
-      </div>
-
-      {/* Engagement Stats */}
+      {/* Long-Form vs Shorts Comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Engagement (Last 10 Videos)</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-gray-400 mb-1">
-                <ThumbsUp size={16} />
-                <span>Total Likes</span>
-              </div>
-              <div className="text-2xl font-bold">{totalLikes.toLocaleString()}</div>
+        {/* Long-form Stats */}
+        <div className="metric-card border-l-4 border-[#FF0000]">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Play size={20} className="text-[#FF0000]" />
+              Long-Form Videos
+            </h3>
+            <span className="text-sm text-gray-500">{longFormVideos.length} videos</span>
+          </div>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Views</span>
+              <span className="font-bold text-white">{longFormViews.toLocaleString()}</span>
             </div>
-            <div>
-              <div className="flex items-center gap-2 text-gray-400 mb-1">
-                <MessageSquare size={16} />
-                <span>Total Comments</span>
-              </div>
-              <div className="text-2xl font-bold">{totalComments.toLocaleString()}</div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Avg Views/Video</span>
+              <span className="font-bold text-brand-lime">{avgLongFormViews.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Likes</span>
+              <span className="font-bold">{longFormLikes.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Comments</span>
+              <span className="font-bold">{longFormComments.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Engagement Rate</span>
+              <span className="font-bold text-brand-lime">
+                {longFormViews > 0 ? ((longFormLikes / longFormViews) * 100).toFixed(2) : 0}%
+              </span>
             </div>
           </div>
         </div>
-        <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">View-to-Engagement Ratio</h3>
-          <div className="text-3xl font-bold text-brand-lime">
-            {totalVideoViews > 0 ? ((totalLikes / totalVideoViews) * 100).toFixed(2) : 0}%
+
+        {/* Shorts Stats */}
+        <div className="metric-card border-l-4 border-purple-500">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Play size={20} className="text-purple-500" />
+              YouTube Shorts
+            </h3>
+            <span className="text-sm text-gray-500">{shortsVideos.length} shorts</span>
           </div>
-          <p className="text-gray-400 mt-2">Likes per 100 views</p>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Views</span>
+              <span className="font-bold text-white">{shortsViews.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Avg Views/Short</span>
+              <span className="font-bold text-purple-400">{avgShortsViews.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Likes</span>
+              <span className="font-bold">{shortsLikes.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Comments</span>
+              <span className="font-bold">{shortsComments.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Engagement Rate</span>
+              <span className="font-bold text-purple-400">
+                {shortsViews > 0 ? ((shortsLikes / shortsViews) * 100).toFixed(2) : 0}%
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Recent Videos - Sorted by Views */}
+      {/* Long-Form Videos Chart */}
+      {longFormChartData.length > 0 && (
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4">Long-Form Video Performance</h3>
+          <SimpleChart data={longFormChartData} color="#FF0000" type="bar" />
+        </div>
+      )}
+
+      {/* Long-Form Videos List */}
       <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4">Recent Videos (by Views)</h3>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Play size={20} className="text-[#FF0000]" />
+          Long-Form Videos (by Views)
+        </h3>
         <div className="space-y-4">
-          {data?.recentVideos?.sort((a, b) => b.viewCount - a.viewCount).map((video, index) => (
+          {longFormVideos.sort((a, b) => b.viewCount - a.viewCount).slice(0, 15).map((video, index) => (
             <div
               key={video.id}
               className="flex gap-4 p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
             >
-              <div className="flex items-center justify-center w-8 h-8 bg-gray-600 rounded-full text-sm font-bold">
+              <div className="flex items-center justify-center w-8 h-8 bg-[#FF0000] rounded-full text-sm font-bold">
                 {index + 1}
               </div>
               <img
@@ -214,11 +293,11 @@ export default function YouTubePage() {
               <div className="flex-1">
                 <h4 className="font-medium text-white line-clamp-2">{video.title}</h4>
                 <p className="text-sm text-gray-400 mt-1">
-                  {new Date(video.publishedAt).toLocaleDateString()}
+                  {new Date(video.publishedAt).toLocaleDateString()} • {video.durationSeconds ? formatDuration(video.durationSeconds) : ''}
                 </p>
                 <div className="flex gap-4 mt-2 text-sm">
                   <span className="flex items-center gap-1 text-brand-lime font-semibold">
-                    <Eye size={14} /> {video.viewCount.toLocaleString()} views
+                    <Eye size={14} /> {video.viewCount.toLocaleString()}
                   </span>
                   <span className="flex items-center gap-1 text-gray-400">
                     <ThumbsUp size={14} /> {video.likeCount.toLocaleString()}
@@ -232,6 +311,44 @@ export default function YouTubePage() {
           ))}
         </div>
       </div>
+
+      {/* Shorts List */}
+      {shortsVideos.length > 0 && (
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Play size={20} className="text-purple-500" />
+            YouTube Shorts (by Views)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {shortsVideos.sort((a, b) => b.viewCount - a.viewCount).slice(0, 12).map((video, index) => (
+              <div
+                key={video.id}
+                className="p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex items-center justify-center w-6 h-6 bg-purple-500 rounded-full text-xs font-bold flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-white text-sm line-clamp-2">{video.title}</h4>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(video.publishedAt).toLocaleDateString()}
+                    </p>
+                    <div className="flex gap-3 mt-2 text-xs">
+                      <span className="text-purple-400 font-semibold">
+                        {video.viewCount.toLocaleString()} views
+                      </span>
+                      <span className="text-gray-500">
+                        {video.likeCount.toLocaleString()} likes
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
