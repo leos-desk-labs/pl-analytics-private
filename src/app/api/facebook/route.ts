@@ -39,29 +39,58 @@ export async function GET() {
       return NextResponse.json({ error: pageInfo.error.message }, { status: 400 });
     }
 
-    // Get Page Insights (last 28 days) - using period=days_28
-    const insightsResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_impressions,page_engaged_users,page_post_engagements,page_video_views,page_views_total&period=days_28&access_token=${pageAccessToken}`
-    );
-    const insightsData = await insightsResponse.json();
-
+    // Get Page Insights - using separate calls for different metric types
+    // Some metrics need 'day' period, others need 'days_28'
     let impressions = 0;
     let engagedUsers = 0;
     let postEngagements = 0;
     let videoViews = 0;
     let pageViews = 0;
 
-    if (insightsData.data) {
-      insightsData.data.forEach((metric: any) => {
-        // Get the most recent value
-        const latestValue = metric.values?.[metric.values.length - 1]?.value || 0;
+    // Try fetching insights with valid v24.0 metrics
+    try {
+      // page_impressions and page_post_engagements with days_28 period
+      const insightsResponse1 = await fetch(
+        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_impressions,page_post_engagements&period=days_28&access_token=${pageAccessToken}`
+      );
+      const insights1 = await insightsResponse1.json();
 
-        if (metric.name === 'page_impressions') impressions = latestValue;
-        if (metric.name === 'page_engaged_users') engagedUsers = latestValue;
-        if (metric.name === 'page_post_engagements') postEngagements = latestValue;
-        if (metric.name === 'page_video_views') videoViews = latestValue;
-        if (metric.name === 'page_views_total') pageViews = latestValue;
-      });
+      if (insights1.data) {
+        insights1.data.forEach((metric: any) => {
+          const latestValue = metric.values?.[metric.values.length - 1]?.value || 0;
+          if (metric.name === 'page_impressions') impressions = latestValue;
+          if (metric.name === 'page_post_engagements') postEngagements = latestValue;
+        });
+      }
+
+      // page_views_total with day period
+      const insightsResponse2 = await fetch(
+        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_views_total&period=day&access_token=${pageAccessToken}`
+      );
+      const insights2 = await insightsResponse2.json();
+
+      if (insights2.data) {
+        // Sum up the last 28 days
+        const pageViewsMetric = insights2.data.find((m: any) => m.name === 'page_views_total');
+        if (pageViewsMetric?.values) {
+          pageViews = pageViewsMetric.values.reduce((sum: number, v: any) => sum + (v.value || 0), 0);
+        }
+      }
+
+      // page_fans_online (for engaged users approximation) with day period
+      const insightsResponse3 = await fetch(
+        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_engaged_users&period=day&access_token=${pageAccessToken}`
+      );
+      const insights3 = await insightsResponse3.json();
+
+      if (insights3.data) {
+        const engagedMetric = insights3.data.find((m: any) => m.name === 'page_engaged_users');
+        if (engagedMetric?.values) {
+          engagedUsers = engagedMetric.values.reduce((sum: number, v: any) => sum + (v.value || 0), 0);
+        }
+      }
+    } catch (insightErr) {
+      console.log('Page insights fetch error (non-fatal):', insightErr);
     }
 
     // Get recent posts with engagement
