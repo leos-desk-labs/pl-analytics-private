@@ -67,8 +67,9 @@ export async function GET() {
     // ============================================
 
     // 1. Fetch ALL videos with pagination (lifetime views per video)
+    // Simplified fields to avoid "reduce data" error
     const allVideos: VideoData[] = [];
-    let videoNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,created_time,length,views,likes.summary(true),comments.summary(true)&limit=100&access_token=${pageAccessToken}`;
+    let videoNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,created_time,views&limit=50&access_token=${pageAccessToken}`;
     let videoPageCount = 0;
 
     let videoFetchError: string | null = null;
@@ -89,12 +90,12 @@ export async function GET() {
             allVideos.push({
               id: video.id,
               title: video.title,
-              description: video.description,
+              description: video.description || '',
               created_time: video.created_time,
-              length: video.length,
+              length: video.length || 0,
               views: video.views || 0,
-              likes: video.likes?.summary?.total_count || 0,
-              comments: video.comments?.summary?.total_count || 0,
+              likes: 0, // Skip to reduce payload
+              comments: 0, // Skip to reduce payload
             });
           }
         }
