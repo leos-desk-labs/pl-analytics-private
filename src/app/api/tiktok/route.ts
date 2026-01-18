@@ -2,13 +2,17 @@ import { NextResponse } from 'next/server';
 import { getCached, setCache, getCacheInfo, getTimeUntilRefresh } from '@/lib/cache';
 
 // TikTok API - Fetch video data and stats for PL account
-// Requires OAuth access token from authorized TikTok account
+// Automatically refreshes access token when expired
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const TIKTOK_ACCESS_TOKEN = process.env.TIKTOK_ACCESS_TOKEN;
+const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
+const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
+const TIKTOK_REFRESH_TOKEN = process.env.TIKTOK_REFRESH_TOKEN;
+
 const CACHE_KEY = 'tiktok_pl_data';
+const TOKEN_CACHE_KEY = 'tiktok_access_token';
 
 interface TikTokVideo {
   id: string;
@@ -32,6 +36,73 @@ interface TikTokUserInfo {
   video_count: number;
 }
 
+interface TokenData {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+
+// In-memory token storage (refreshes on each cold start, but that's fine since we refresh anyway)
+let cachedToken: TokenData | null = null;
+
+async function getValidAccessToken(): Promise<string | null> {
+  // Check if we have a cached token that's still valid (with 5 min buffer)
+  if (cachedToken && cachedToken.expires_at > Date.now() + 5 * 60 * 1000) {
+    return cachedToken.access_token;
+  }
+
+  // Need to refresh the token
+  if (!TIKTOK_CLIENT_KEY || !TIKTOK_CLIENT_SECRET || !TIKTOK_REFRESH_TOKEN) {
+    console.error('Missing TikTok credentials for token refresh');
+    return null;
+  }
+
+  try {
+    console.log('Refreshing TikTok access token...');
+
+    const refreshToken = cachedToken?.refresh_token || TIKTOK_REFRESH_TOKEN;
+
+    const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_key: TIKTOK_CLIENT_KEY,
+        client_secret: TIKTOK_CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+
+    const tokenData = await tokenResponse.json();
+
+    if (tokenData.error) {
+      console.error('TikTok token refresh error:', tokenData);
+      return null;
+    }
+
+    // Cache the new tokens
+    cachedToken = {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || refreshToken, // TikTok may return a new refresh token
+      expires_at: Date.now() + (tokenData.expires_in * 1000),
+    };
+
+    console.log('TikTok token refreshed successfully, expires in', tokenData.expires_in, 'seconds');
+
+    // Log the new refresh token if it changed (you may want to update env var)
+    if (tokenData.refresh_token && tokenData.refresh_token !== TIKTOK_REFRESH_TOKEN) {
+      console.log('New refresh token issued - update TIKTOK_REFRESH_TOKEN env var:', tokenData.refresh_token);
+    }
+
+    return cachedToken.access_token;
+  } catch (error) {
+    console.error('Failed to refresh TikTok token:', error);
+    return null;
+  }
+}
+
 export async function GET() {
   // Check for cached data (refreshes daily at 5am ET)
   const cachedData = getCached<Record<string, unknown>>(CACHE_KEY);
@@ -47,12 +118,16 @@ export async function GET() {
     });
   }
 
-  if (!TIKTOK_ACCESS_TOKEN) {
+  // Get a valid access token (auto-refreshes if needed)
+  const accessToken = await getValidAccessToken();
+
+  if (!accessToken) {
     return NextResponse.json({
-      error: 'TikTok not connected',
-      setup_required: true,
-      setup_url: '/api/tiktok/auth',
-      message: 'Visit /api/tiktok/auth to connect your TikTok account',
+      error: 'TikTok authentication failed',
+      setup_required: !TIKTOK_REFRESH_TOKEN,
+      message: TIKTOK_REFRESH_TOKEN
+        ? 'Token refresh failed. The refresh token may have expired (valid for 365 days). Re-authorize at /api/tiktok/auth'
+        : 'Missing TIKTOK_REFRESH_TOKEN. Visit /api/tiktok/auth to connect your TikTok account',
     }, { status: 401 });
   }
 
@@ -62,7 +137,7 @@ export async function GET() {
       'https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url,follower_count,following_count,likes_count,video_count',
       {
         headers: {
-          'Authorization': `Bearer ${TIKTOK_ACCESS_TOKEN}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
       }
     );
@@ -71,11 +146,20 @@ export async function GET() {
 
     if (userInfoData.error?.code) {
       console.error('TikTok user info error:', userInfoData.error);
+
+      // If token is invalid, clear cache and retry once
+      if (userInfoData.error.code === 'access_token_invalid') {
+        cachedToken = null;
+        return NextResponse.json({
+          error: 'TikTok token invalid',
+          message: 'Please try again. If this persists, re-authorize at /api/tiktok/auth',
+        }, { status: 401 });
+      }
+
       return NextResponse.json({
         error: 'Failed to fetch TikTok user info',
         details: userInfoData.error,
-        token_expired: userInfoData.error.code === 'access_token_invalid',
-      }, { status: 401 });
+      }, { status: 500 });
     }
 
     const userInfo: TikTokUserInfo = userInfoData.data?.user || {};
@@ -86,7 +170,7 @@ export async function GET() {
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${TIKTOK_ACCESS_TOKEN}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
