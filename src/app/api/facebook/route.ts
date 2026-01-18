@@ -2,13 +2,33 @@ import { NextResponse } from 'next/server';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 
+interface VideoData {
+  id: string;
+  title?: string;
+  description?: string;
+  created_time: string;
+  length?: number;
+  views: number;
+  likes: number;
+  comments: number;
+}
+
+interface PostData {
+  id: string;
+  message?: string;
+  created_time: string;
+  reactions: number;
+  comments: number;
+  shares: number;
+}
+
 export async function GET() {
   if (!META_ACCESS_TOKEN) {
     return NextResponse.json({ error: 'META_ACCESS_TOKEN not configured' }, { status: 500 });
   }
 
   try {
-    // First, get the list of pages the user manages and their page access tokens
+    // Get page access token
     const pagesResponse = await fetch(
       `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,access_token,followers_count,fan_count&access_token=${META_ACCESS_TOKEN}`
     );
@@ -18,18 +38,17 @@ export async function GET() {
       return NextResponse.json({ error: pagesData.error.message }, { status: 400 });
     }
 
-    // Find the Peoples League page (or use the first page if only one)
     const pages = pagesData.data || [];
     const plPage = pages.find((p: any) => p.name?.toLowerCase().includes('peoples league')) || pages[0];
 
     if (!plPage) {
-      return NextResponse.json({ error: 'No Facebook Pages found. Make sure the token has pages_show_list permission.' }, { status: 400 });
+      return NextResponse.json({ error: 'No Facebook Pages found.' }, { status: 400 });
     }
 
     const pageId = plPage.id;
-    const pageAccessToken = plPage.access_token; // Use the page-specific token
+    const pageAccessToken = plPage.access_token;
 
-    // Get additional page info
+    // Get page info
     const pageInfoResponse = await fetch(
       `https://graph.facebook.com/v24.0/${pageId}?fields=id,name,followers_count,fan_count,link,picture&access_token=${pageAccessToken}`
     );
@@ -39,109 +58,192 @@ export async function GET() {
       return NextResponse.json({ error: pageInfo.error.message }, { status: 400 });
     }
 
-    // Get Page Insights - only using metrics valid in v24.0
-    // Note: page_impressions and page_engaged_users are deprecated
-    let postEngagements = 0;
-    let videoViews = 0;
-    let pageViews = 0;
+    // ============================================
+    // COMPREHENSIVE DATA COLLECTION - ALL CONTENT
+    // ============================================
 
-    // Fetch insights with valid v24.0 metrics
-    try {
-      // page_post_engagements with days_28 period (this metric still works)
-      const engagementsResponse = await fetch(
-        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_post_engagements&period=days_28&access_token=${pageAccessToken}`
-      );
-      const engagementsData = await engagementsResponse.json();
+    // 1. Fetch ALL videos with pagination (lifetime views per video)
+    const allVideos: VideoData[] = [];
+    let videoNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,created_time,length,views,likes.summary(true),comments.summary(true)&limit=100&access_token=${pageAccessToken}`;
 
-      if (engagementsData.data) {
-        const engMetric = engagementsData.data.find((m: any) => m.name === 'page_post_engagements');
-        if (engMetric?.values?.length > 0) {
-          // Get the most recent value
-          postEngagements = engMetric.values[engMetric.values.length - 1]?.value || 0;
-        }
+    while (videoNextUrl) {
+      const videoResponse = await fetch(videoNextUrl);
+      const videoData = await videoResponse.json();
+
+      if (videoData.data) {
+        videoData.data.forEach((video: any) => {
+          allVideos.push({
+            id: video.id,
+            title: video.title,
+            description: video.description,
+            created_time: video.created_time,
+            length: video.length,
+            views: video.views || 0,
+            likes: video.likes?.summary?.total_count || 0,
+            comments: video.comments?.summary?.total_count || 0,
+          });
+        });
       }
 
-      // page_views_total with day period
-      const viewsResponse = await fetch(
-        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_views_total&period=day&access_token=${pageAccessToken}`
-      );
+      videoNextUrl = videoData.paging?.next || null;
+    }
+
+    // 2. Fetch ALL posts with pagination (lifetime engagement per post)
+    const allPosts: PostData[] = [];
+    let postNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,shares,reactions.summary(total_count),comments.summary(total_count)&limit=100&access_token=${pageAccessToken}`;
+
+    while (postNextUrl) {
+      const postResponse = await fetch(postNextUrl);
+      const postData = await postResponse.json();
+
+      if (postData.data) {
+        postData.data.forEach((post: any) => {
+          allPosts.push({
+            id: post.id,
+            message: post.message,
+            created_time: post.created_time,
+            reactions: post.reactions?.summary?.total_count || 0,
+            comments: post.comments?.summary?.total_count || 0,
+            shares: post.shares?.count || 0,
+          });
+        });
+      }
+
+      postNextUrl = postData.paging?.next || null;
+    }
+
+    // 3. Get 28-day rolling engagement from Page Insights (for trend comparison)
+    let engagements28Day = 0;
+    let pageViews = 0;
+
+    try {
+      const [engResponse, viewsResponse] = await Promise.all([
+        fetch(`https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_post_engagements&period=days_28&access_token=${pageAccessToken}`),
+        fetch(`https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_views_total&period=day&access_token=${pageAccessToken}`),
+      ]);
+
+      const engData = await engResponse.json();
       const viewsData = await viewsResponse.json();
+
+      if (engData.data) {
+        const engMetric = engData.data.find((m: any) => m.name === 'page_post_engagements');
+        engagements28Day = engMetric?.values?.[engMetric.values.length - 1]?.value || 0;
+      }
 
       if (viewsData.data) {
         const pageViewsMetric = viewsData.data.find((m: any) => m.name === 'page_views_total');
-        if (pageViewsMetric?.values) {
-          pageViews = pageViewsMetric.values.reduce((sum: number, v: any) => sum + (v.value || 0), 0);
-        }
+        pageViews = pageViewsMetric?.values?.reduce((sum: number, v: any) => sum + (v.value || 0), 0) || 0;
       }
-    } catch (insightErr) {
-      console.log('Page insights fetch error (non-fatal):', insightErr);
+    } catch (e) {
+      console.log('Insights fetch error:', e);
     }
 
-    // Get recent posts with engagement (using reactions instead of likes for v24.0)
-    const postsResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,shares,reactions.summary(total_count),comments.summary(total_count)&limit=25&access_token=${pageAccessToken}`
-    );
-    const postsData = await postsResponse.json();
+    // ============================================
+    // CALCULATE LIFETIME TOTALS
+    // ============================================
 
-    let totalLikes = 0;
-    let totalComments = 0;
-    let totalShares = 0;
-    const recentPosts: any[] = [];
+    // Lifetime video metrics
+    const lifetimeVideoViews = allVideos.reduce((sum, v) => sum + v.views, 0);
+    const lifetimeVideoLikes = allVideos.reduce((sum, v) => sum + v.likes, 0);
+    const lifetimeVideoComments = allVideos.reduce((sum, v) => sum + v.comments, 0);
 
-    if (postsData.data) {
-      postsData.data.forEach((post: any) => {
-        const reactions = post.reactions?.summary?.total_count || 0;
-        const comments = post.comments?.summary?.total_count || 0;
-        const shares = post.shares?.count || 0;
+    // Lifetime post metrics (all content)
+    const lifetimeReactions = allPosts.reduce((sum, p) => sum + p.reactions, 0);
+    const lifetimeComments = allPosts.reduce((sum, p) => sum + p.comments, 0);
+    const lifetimeShares = allPosts.reduce((sum, p) => sum + p.shares, 0);
+    const lifetimeEngagements = lifetimeReactions + lifetimeComments + lifetimeShares;
 
-        totalLikes += reactions;
-        totalComments += comments;
-        totalShares += shares;
+    // Top performing videos (sorted by views)
+    const topVideos = [...allVideos]
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 10)
+      .map(v => ({
+        id: v.id,
+        title: v.title?.substring(0, 80) || v.description?.substring(0, 80) || '(No title)',
+        views: v.views,
+        likes: v.likes,
+        comments: v.comments,
+        createdTime: v.created_time,
+      }));
 
-        recentPosts.push({
-          id: post.id,
-          message: post.message?.substring(0, 100) || '',
-          createdTime: post.created_time,
-          likes: reactions,
-          comments,
-          shares,
-        });
-      });
-    }
+    // Top performing posts (sorted by engagement)
+    const topPosts = [...allPosts]
+      .sort((a, b) => (b.reactions + b.comments + b.shares) - (a.reactions + a.comments + a.shares))
+      .slice(0, 5)
+      .map(p => ({
+        id: p.id,
+        message: p.message?.substring(0, 100) || '',
+        createdTime: p.created_time,
+        reactions: p.reactions,
+        comments: p.comments,
+        shares: p.shares,
+        totalEngagement: p.reactions + p.comments + p.shares,
+      }));
 
-    // Get video posts specifically for video views
-    const videosResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,length,views,likes.summary(true)&limit=25&access_token=${pageAccessToken}`
-    );
-    const videosData = await videosResponse.json();
+    // Recent posts for display
+    const recentPosts = [...allPosts]
+      .sort((a, b) => new Date(b.created_time).getTime() - new Date(a.created_time).getTime())
+      .slice(0, 5)
+      .map(p => ({
+        id: p.id,
+        message: p.message?.substring(0, 100) || '',
+        createdTime: p.created_time,
+        likes: p.reactions,
+        comments: p.comments,
+        shares: p.shares,
+      }));
 
-    let totalVideoViewsFromPosts = 0;
-    if (videosData.data) {
-      videosData.data.forEach((video: any) => {
-        totalVideoViewsFromPosts += video.views || 0;
-      });
-    }
-
-    // Use the higher of the two video view counts
-    const finalVideoViews = Math.max(videoViews, totalVideoViewsFromPosts);
+    // Calculate averages
+    const avgViewsPerVideo = allVideos.length > 0 ? Math.round(lifetimeVideoViews / allVideos.length) : 0;
+    const avgEngagementPerPost = allPosts.length > 0 ? Math.round(lifetimeEngagements / allPosts.length) : 0;
 
     return NextResponse.json({
+      // Page Info
       pageId,
       pageName: pageInfo.name,
       followers: pageInfo.followers_count || pageInfo.fan_count || 0,
       pageLink: pageInfo.link,
       picture: pageInfo.picture?.data?.url,
-      // Insights (last 28 days)
-      // Note: impressions metric deprecated in v24.0, using post engagements instead
-      videoViews: finalVideoViews,
+
+      // LIFETIME TOTALS (comprehensive)
+      lifetime: {
+        videoViews: lifetimeVideoViews,
+        videoCount: allVideos.length,
+        postCount: allPosts.length,
+        reactions: lifetimeReactions,
+        comments: lifetimeComments,
+        shares: lifetimeShares,
+        totalEngagements: lifetimeEngagements,
+        avgViewsPerVideo,
+        avgEngagementPerPost,
+      },
+
+      // 28-Day Rolling (for trend analysis)
+      rolling28Day: {
+        engagements: engagements28Day,
+        pageViews,
+      },
+
+      // Top Performers
+      topVideos,
+      topPosts,
+      recentPosts,
+
+      // Legacy fields for backwards compatibility
+      videoViews: lifetimeVideoViews,
       pageViews,
-      // Engagements (28 day rolling)
-      engagements: postEngagements,
-      totalLikes,
-      totalComments,
-      totalShares,
-      // Recent posts
-      recentPosts: recentPosts.slice(0, 5),
+      engagements: lifetimeEngagements, // Now lifetime, not 28-day
+      totalLikes: lifetimeReactions,
+      totalComments: lifetimeComments,
+      totalShares: lifetimeShares,
+
+      // Metadata
+      _meta: {
+        videosAnalyzed: allVideos.length,
+        postsAnalyzed: allPosts.length,
+        dataType: 'lifetime',
+        generatedAt: new Date().toISOString(),
+      },
     });
   } catch (error) {
     console.error('Facebook API error:', error);

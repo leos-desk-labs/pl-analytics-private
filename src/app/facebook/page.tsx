@@ -3,18 +3,48 @@
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
 import SimpleChart from '@/components/SimpleChart';
-import { Facebook, Eye, Heart, TrendingUp, Users, Play, Share2, MessageCircle } from 'lucide-react';
+import { Facebook, Eye, Heart, Users, Play, Share2, MessageCircle, TrendingUp, BarChart3 } from 'lucide-react';
+
+interface TopVideo {
+  id: string;
+  title: string;
+  views: number;
+  likes: number;
+  comments: number;
+  createdTime: string;
+}
+
+interface TopPost {
+  id: string;
+  message: string;
+  createdTime: string;
+  reactions: number;
+  comments: number;
+  shares: number;
+  totalEngagement: number;
+}
 
 interface FacebookData {
   pageId: string;
   pageName: string;
   followers: number;
-  videoViews: number;
-  pageViews: number;
-  engagements: number;
-  totalLikes: number;
-  totalComments: number;
-  totalShares: number;
+  lifetime: {
+    videoViews: number;
+    videoCount: number;
+    postCount: number;
+    reactions: number;
+    comments: number;
+    shares: number;
+    totalEngagements: number;
+    avgViewsPerVideo: number;
+    avgEngagementPerPost: number;
+  };
+  rolling28Day: {
+    engagements: number;
+    pageViews: number;
+  };
+  topVideos: TopVideo[];
+  topPosts: TopPost[];
   recentPosts: Array<{
     id: string;
     message: string;
@@ -23,6 +53,12 @@ interface FacebookData {
     comments: number;
     shares: number;
   }>;
+  _meta: {
+    videosAnalyzed: number;
+    postsAnalyzed: number;
+    dataType: string;
+    generatedAt: string;
+  };
   error?: string;
 }
 
@@ -42,21 +78,11 @@ export default function FacebookPage() {
         }
         setLoading(false);
       })
-      .catch(err => {
+      .catch(() => {
         setError('Failed to fetch Facebook data');
         setLoading(false);
       });
   }, []);
-
-  // Generate chart data from real metrics
-  const generateChartData = () => {
-    if (!data) return [];
-    return [
-      { name: 'Video Views', value: data.videoViews },
-      { name: 'Engagements', value: data.engagements },
-      { name: 'Page Views', value: data.pageViews },
-    ].filter(d => d.value > 0);
-  };
 
   if (loading) {
     return (
@@ -82,21 +108,25 @@ export default function FacebookPage() {
         </div>
         <div className="metric-card border-red-500/50">
           <p className="text-red-400">Error: {error}</p>
-          <p className="text-gray-500 text-sm mt-2">
-            Make sure you have admin access to the Peoples League Facebook Page.
-          </p>
         </div>
       </div>
     );
   }
 
-  // Calculate engagement rate based on followers since reach metric is deprecated
-  const engagementRate = data && data.followers > 0
-    ? ((data.engagements / data.followers) * 100).toFixed(2)
-    : '0.00';
+  const lifetime = data?.lifetime;
+  const engagementRate = data && data.followers > 0 && lifetime
+    ? ((lifetime.totalEngagements / data.followers) * 100).toFixed(1)
+    : '0';
+
+  // Chart data for top videos
+  const videoChartData = data?.topVideos?.slice(0, 5).map((v, i) => ({
+    name: `#${i + 1}`,
+    value: v.views,
+  })) || [];
 
   return (
     <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -105,145 +135,193 @@ export default function FacebookPage() {
           </h1>
           <p className="text-gray-400 mt-1">{data?.pageName}</p>
         </div>
-        <span className="px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400">
-          Live Data
-        </span>
+        <div className="text-right">
+          <span className="px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400">
+            Lifetime Data
+          </span>
+          <p className="text-xs text-gray-500 mt-1">
+            {data?._meta?.videosAnalyzed} videos, {data?._meta?.postsAnalyzed} posts analyzed
+          </p>
+        </div>
       </div>
 
-      {/* Primary Metric: Video Views */}
+      {/* Primary Metric: Lifetime Video Views */}
       <div className="metric-card bg-gradient-to-r from-[#1877F2]/20 to-gray-800 border-2 border-[#1877F2]">
         <div className="flex items-center gap-3 mb-2">
           <Play className="text-[#1877F2]" size={28} />
-          <h2 className="text-lg text-gray-300">Video Views</h2>
+          <h2 className="text-lg text-gray-300">Lifetime Video Views</h2>
         </div>
         <div className="text-5xl font-bold text-white">
-          {data?.videoViews?.toLocaleString() || '0'}
+          {lifetime?.videoViews?.toLocaleString() || '0'}
         </div>
-        <p className="text-gray-400 mt-2">Last 28 days</p>
+        <p className="text-gray-400 mt-2">
+          Across {lifetime?.videoCount || 0} videos ({lifetime?.avgViewsPerVideo?.toLocaleString() || 0} avg per video)
+        </p>
       </div>
 
-      {/* Key Metrics Grid */}
+      {/* Key Lifetime Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Video Views"
-          value={data?.videoViews?.toLocaleString() || '0'}
-          change="Primary metric"
+          label="Total Video Views"
+          value={lifetime?.videoViews?.toLocaleString() || '0'}
+          change="Lifetime"
           changeType="positive"
           icon={<Play size={20} className="text-[#1877F2]" />}
         />
         <MetricCard
-          label="Engagements"
-          value={data?.engagements?.toLocaleString() || '0'}
-          change="Last 28 days"
+          label="Total Engagements"
+          value={lifetime?.totalEngagements?.toLocaleString() || '0'}
+          change="Lifetime"
           changeType="positive"
           icon={<Heart size={20} />}
         />
         <MetricCard
-          label="Page Views"
-          value={data?.pageViews?.toLocaleString() || '0'}
-          change="Last 28 days"
+          label="Engagement Rate"
+          value={`${engagementRate}%`}
+          change="Per follower"
           changeType="positive"
-          icon={<Eye size={20} />}
+          icon={<TrendingUp size={20} />}
         />
         <MetricCard
           label="Followers"
           value={data?.followers?.toLocaleString() || '0'}
-          change="Total followers"
+          change="Current"
           changeType="neutral"
           icon={<Users size={20} />}
         />
       </div>
 
-      {/* Performance Chart */}
-      {generateChartData().length > 0 && (
-        <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Performance Overview</h3>
-          <SimpleChart data={generateChartData()} color="#1877F2" type="bar" />
-        </div>
-      )}
-
-      {/* 28-Day Engagements Highlight */}
-      <div className="metric-card bg-gradient-to-r from-[#1877F2]/10 to-gray-800">
-        <h3 className="text-lg font-semibold mb-4">28-Day Performance</h3>
-        <div className="grid grid-cols-2 gap-8">
-          <div>
-            <p className="text-gray-400 mb-1">Total Engagements</p>
-            <div className="text-4xl font-bold text-brand-lime">{data?.engagements?.toLocaleString() || '0'}</div>
-            <p className="text-sm text-gray-500 mt-1">Likes, comments, shares, clicks</p>
-          </div>
-          <div>
-            <p className="text-gray-400 mb-1">Engagement Rate</p>
-            <div className="text-4xl font-bold text-brand-lime">{engagementRate}%</div>
-            <p className="text-sm text-gray-500 mt-1">Engagements per follower</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Content Engagement */}
+      {/* Lifetime Engagement Breakdown */}
       <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4">Content Engagement</h3>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <Heart className="mx-auto mb-2 text-red-400" size={24} />
-            <div className="text-2xl font-bold">{data?.totalLikes?.toLocaleString() || '0'}</div>
-            <p className="text-xs text-gray-500">Reactions</p>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <BarChart3 size={20} className="text-[#1877F2]" />
+          Lifetime Engagement Breakdown
+        </h3>
+        <div className="grid grid-cols-3 gap-6 text-center">
+          <div className="bg-gray-800/50 rounded-lg p-4">
+            <Heart className="mx-auto mb-2 text-red-400" size={28} />
+            <div className="text-3xl font-bold text-white">{lifetime?.reactions?.toLocaleString() || '0'}</div>
+            <p className="text-sm text-gray-400 mt-1">Reactions</p>
           </div>
-          <div>
-            <MessageCircle className="mx-auto mb-2 text-blue-400" size={24} />
-            <div className="text-2xl font-bold">{data?.totalComments?.toLocaleString() || '0'}</div>
-            <p className="text-xs text-gray-500">Comments</p>
+          <div className="bg-gray-800/50 rounded-lg p-4">
+            <MessageCircle className="mx-auto mb-2 text-blue-400" size={28} />
+            <div className="text-3xl font-bold text-white">{lifetime?.comments?.toLocaleString() || '0'}</div>
+            <p className="text-sm text-gray-400 mt-1">Comments</p>
           </div>
-          <div>
-            <Share2 className="mx-auto mb-2 text-green-400" size={24} />
-            <div className="text-2xl font-bold">{data?.totalShares?.toLocaleString() || '0'}</div>
-            <p className="text-xs text-gray-500">Shares</p>
+          <div className="bg-gray-800/50 rounded-lg p-4">
+            <Share2 className="mx-auto mb-2 text-green-400" size={28} />
+            <div className="text-3xl font-bold text-white">{lifetime?.shares?.toLocaleString() || '0'}</div>
+            <p className="text-sm text-gray-400 mt-1">Shares</p>
           </div>
         </div>
       </div>
 
-      {/* Views Performance */}
-      {data && data.videoViews > 0 && (
-        <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Video Performance</h3>
-          <div className="grid grid-cols-2 gap-8">
+      {/* 28-Day Rolling vs Lifetime Comparison */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="metric-card bg-gradient-to-r from-[#1877F2]/10 to-gray-800">
+          <h3 className="text-lg font-semibold mb-4">28-Day Performance</h3>
+          <div className="space-y-4">
             <div>
-              <p className="text-gray-400 mb-1">Views per Follower</p>
+              <p className="text-gray-400 mb-1">Rolling Engagements</p>
               <div className="text-3xl font-bold text-brand-lime">
-                {(data.videoViews / (data.followers || 1)).toFixed(1)}x
+                {data?.rolling28Day?.engagements?.toLocaleString() || '0'}
               </div>
-              <p className="text-sm text-gray-500 mt-1">
-                Video content reaches {(data.videoViews / (data.followers || 1)).toFixed(1)}x your follower count
-              </p>
             </div>
             <div>
               <p className="text-gray-400 mb-1">Page Views</p>
-              <div className="text-3xl font-bold text-white">{data?.pageViews?.toLocaleString() || '0'}</div>
-              <p className="text-sm text-gray-500 mt-1">Profile visits (recent)</p>
+              <div className="text-2xl font-bold text-white">
+                {data?.rolling28Day?.pageViews?.toLocaleString() || '0'}
+              </div>
             </div>
+          </div>
+        </div>
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4">Content Summary</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Total Videos</span>
+              <span className="text-xl font-bold">{lifetime?.videoCount || 0}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Total Posts</span>
+              <span className="text-xl font-bold">{lifetime?.postCount || 0}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Avg Views/Video</span>
+              <span className="text-xl font-bold text-brand-lime">{lifetime?.avgViewsPerVideo?.toLocaleString() || 0}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Avg Engagement/Post</span>
+              <span className="text-xl font-bold text-brand-lime">{lifetime?.avgEngagementPerPost?.toLocaleString() || 0}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Videos Chart */}
+      {videoChartData.length > 0 && (
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4">Top 5 Videos by Views</h3>
+          <SimpleChart data={videoChartData} color="#1877F2" type="bar" />
+        </div>
+      )}
+
+      {/* Top Performing Videos List */}
+      {data?.topVideos && data.topVideos.length > 0 && (
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4">Top Performing Videos</h3>
+          <div className="space-y-3">
+            {data.topVideos.slice(0, 5).map((video, index) => (
+              <div key={video.id} className="flex items-center gap-4 bg-gray-800/50 rounded-lg p-3">
+                <div className="flex items-center justify-center w-8 h-8 bg-[#1877F2] rounded-full text-sm font-bold">
+                  {index + 1}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-300 line-clamp-1">{video.title}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(video.createdTime).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-brand-lime">{video.views.toLocaleString()}</div>
+                  <p className="text-xs text-gray-500">views</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Recent Posts */}
-      {data?.recentPosts && data.recentPosts.length > 0 && (
+      {/* Top Performing Posts */}
+      {data?.topPosts && data.topPosts.length > 0 && (
         <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Recent Posts</h3>
+          <h3 className="text-lg font-semibold mb-4">Top Performing Posts (by Engagement)</h3>
           <div className="space-y-3">
-            {data.recentPosts.map((post) => (
+            {data.topPosts.map((post, index) => (
               <div key={post.id} className="bg-gray-800/50 rounded-lg p-3">
-                <p className="text-sm text-gray-300 mb-2">
-                  {post.message || '(No text)'}
-                </p>
-                <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <Heart size={12} /> {post.likes}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MessageCircle size={12} /> {post.comments}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Share2 size={12} /> {post.shares}
-                  </span>
+                <div className="flex items-start gap-3">
+                  <div className="flex items-center justify-center w-6 h-6 bg-gray-600 rounded-full text-xs font-bold flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-300 mb-2">
+                      {post.message || '(No text)'}
+                    </p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Heart size={12} className="text-red-400" /> {post.reactions}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MessageCircle size={12} className="text-blue-400" /> {post.comments}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Share2 size={12} className="text-green-400" /> {post.shares}
+                      </span>
+                      <span className="ml-auto font-semibold text-brand-lime">
+                        {post.totalEngagement} total
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
