@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+const META_PAGE_ID = process.env.META_PAGE_ID;
 
 export async function GET() {
   if (!META_ACCESS_TOKEN) {
@@ -8,25 +9,32 @@ export async function GET() {
   }
 
   try {
-    // Get pages
+    let pageId: string;
+    let pageAccessToken: string;
+
+    // Try to get page access token from User token first
     const pagesResponse = await fetch(
       `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,access_token,followers_count,fan_count&access_token=${META_ACCESS_TOKEN}`
     );
     const pagesData = await pagesResponse.json();
 
-    if (pagesData.error) {
-      return NextResponse.json({ error: 'Pages error', details: pagesData.error }, { status: 400 });
+    if (!pagesData.error && pagesData.data?.length > 0) {
+      const pages = pagesData.data || [];
+      const plPage = pages.find((p: any) => p.name?.toLowerCase().includes('peoples league')) || pages[0];
+
+      if (!plPage) {
+        return NextResponse.json({ error: 'No page found' }, { status: 400 });
+      }
+
+      pageId = plPage.id;
+      pageAccessToken = plPage.access_token;
+    } else if (META_PAGE_ID) {
+      // Fallback: Token is already a Page Access Token
+      pageId = META_PAGE_ID;
+      pageAccessToken = META_ACCESS_TOKEN;
+    } else {
+      return NextResponse.json({ error: 'No page found', details: pagesData.error }, { status: 400 });
     }
-
-    const pages = pagesData.data || [];
-    const plPage = pages.find((p: any) => p.name?.toLowerCase().includes('peoples league')) || pages[0];
-
-    if (!plPage) {
-      return NextResponse.json({ error: 'No page found' }, { status: 400 });
-    }
-
-    const pageId = plPage.id;
-    const pageAccessToken = plPage.access_token;
 
     // Test individual insights endpoints to see which work
     const insightsTests: Record<string, any> = {};
