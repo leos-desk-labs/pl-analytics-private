@@ -69,7 +69,7 @@ export async function GET() {
     // 1. Fetch ALL videos with pagination (lifetime views per video)
     // Simplified fields to avoid "reduce data" error
     const allVideos: VideoData[] = [];
-    let videoNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,created_time,views&limit=50&access_token=${pageAccessToken}`;
+    let videoNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,created_time,views&limit=50&access_token=${pageAccessToken}`;
     let videoPageCount = 0;
 
     let videoFetchError: string | null = null;
@@ -179,7 +179,7 @@ export async function GET() {
       .slice(0, 10)
       .map(v => ({
         id: v.id,
-        title: v.title?.substring(0, 80) || v.description?.substring(0, 80) || '(No title)',
+        title: v.title || v.description?.substring(0, 80) || '(Reel)',
         views: v.views,
         likes: v.likes,
         comments: v.comments,
