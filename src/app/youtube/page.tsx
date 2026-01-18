@@ -153,7 +153,7 @@ export default function YouTubePage() {
         )}
       </div>
 
-      {/* PRIMARY METRIC: Lifetime Channel Views */}
+      {/* PRIMARY METRIC: Lifetime Channel Views with Breakdown */}
       <div className="metric-card bg-gradient-to-r from-[#FF0000]/20 to-gray-800 border-2 border-[#FF0000]">
         <div className="flex items-center gap-3 mb-2">
           <Eye className="text-[#FF0000]" size={28} />
@@ -163,6 +163,33 @@ export default function YouTubePage() {
           {(data?.viewCount || 0).toLocaleString()}
         </div>
         <p className="text-gray-400 mt-2">Total views across {data?.videoCount || 0} videos</p>
+
+        {/* Lifetime Breakdown */}
+        <div className="mt-6 pt-4 border-t border-gray-700">
+          <p className="text-sm text-gray-400 mb-3">Breakdown (from {data?._meta?.videosAnalyzed || 0} most recent videos analyzed):</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-gray-500">Long-Form Views</p>
+              <p className="text-lg font-bold text-white">{(lifetime?.longForm?.views || 0).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">{lifetime?.longForm?.videoCount || 0} videos</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Shorts Views</p>
+              <p className="text-lg font-bold text-purple-400">{(lifetime?.shorts?.views || 0).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">{lifetime?.shorts?.videoCount || 0} shorts</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Analyzed Total</p>
+              <p className="text-lg font-bold text-brand-lime">{((lifetime?.longForm?.views || 0) + (lifetime?.shorts?.views || 0)).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">{(lifetime?.totalAnalyzedVideos || 0)} videos</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Older Content</p>
+              <p className="text-lg font-bold text-gray-400">{((data?.viewCount || 0) - (lifetime?.longForm?.views || 0) - (lifetime?.shorts?.views || 0)).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">{(data?.videoCount || 0) - (lifetime?.totalAnalyzedVideos || 0)} videos</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* YTD Overview Cards */}
