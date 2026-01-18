@@ -69,11 +69,23 @@ export async function GET() {
     );
     const postsData = await postsResponse.json();
 
-    // Test video endpoint
+    // Test video endpoints - check multiple locations for videos
     const videosResponse = await fetch(
       `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,views&limit=5&access_token=${pageAccessToken}`
     );
     const videosData = await videosResponse.json();
+
+    // Check for published posts (which may include Reels)
+    const publishedResponse = await fetch(
+      `https://graph.facebook.com/v24.0/${pageId}/published_posts?fields=id,message,type,shares,reactions.summary(true),comments.summary(true)&limit=10&access_token=${pageAccessToken}`
+    );
+    const publishedData = await publishedResponse.json();
+
+    // Check feed for video content
+    const feedResponse = await fetch(
+      `https://graph.facebook.com/v24.0/${pageId}/feed?fields=id,message,type,status_type,attachments{type,media_type,subattachments},shares,reactions.summary(true)&limit=10&access_token=${pageAccessToken}`
+    );
+    const feedData = await feedResponse.json();
 
     // Test token permissions
     const tokenDebugResponse = await fetch(
@@ -89,6 +101,8 @@ export async function GET() {
       insightsTests: insightsData,
       postsResponse: postsData,
       videosResponse: videosData,
+      publishedPostsResponse: publishedData,
+      feedResponse: feedData,
     });
   } catch (error) {
     console.error('Debug error:', error);
