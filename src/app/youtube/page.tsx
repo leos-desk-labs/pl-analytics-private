@@ -19,16 +19,41 @@ interface Video {
   videoType?: 'short' | 'long';
 }
 
+interface VideoStats {
+  videoCount: number;
+  views: number;
+  likes: number;
+  comments: number;
+  avgViews?: number;
+}
+
 interface YouTubeData {
   channelId: string;
   title: string;
   subscriberCount: number;
   viewCount: number;
   videoCount: number;
+  ytd: {
+    year: number;
+    longForm: VideoStats;
+    shorts: VideoStats;
+    totalViews: number;
+    totalVideos: number;
+  };
+  lifetime: {
+    longForm: VideoStats;
+    shorts: VideoStats;
+    totalAnalyzedVideos: number;
+  };
+  topPerformers: {
+    longForm: Video[];
+    shorts: Video[];
+  };
   recentVideos: Video[];
   _meta?: {
     generatedAt: string;
     source: string;
+    videosAnalyzed: number;
   };
 }
 
@@ -90,32 +115,15 @@ export default function YouTubePage() {
     );
   }
 
-  // Separate Long-form videos and Shorts
-  const longFormVideos = data?.recentVideos?.filter(v => !v.isShort) || [];
-  const shortsVideos = data?.recentVideos?.filter(v => v.isShort) || [];
+  const ytd = data?.ytd;
+  const lifetime = data?.lifetime;
+  const currentYear = ytd?.year || new Date().getFullYear();
 
-  // Long-form stats
-  const longFormViews = longFormVideos.reduce((sum, v) => sum + v.viewCount, 0);
-  const longFormLikes = longFormVideos.reduce((sum, v) => sum + v.likeCount, 0);
-  const longFormComments = longFormVideos.reduce((sum, v) => sum + v.commentCount, 0);
-  const avgLongFormViews = longFormVideos.length ? Math.round(longFormViews / longFormVideos.length) : 0;
-
-  // Shorts stats
-  const shortsViews = shortsVideos.reduce((sum, v) => sum + v.viewCount, 0);
-  const shortsLikes = shortsVideos.reduce((sum, v) => sum + v.likeCount, 0);
-  const shortsComments = shortsVideos.reduce((sum, v) => sum + v.commentCount, 0);
-  const avgShortsViews = shortsVideos.length ? Math.round(shortsViews / shortsVideos.length) : 0;
-
-  // Total stats (all videos)
-  const totalVideoViews = data?.recentVideos?.reduce((sum, v) => sum + v.viewCount, 0) || 0;
-  const totalLikes = data?.recentVideos?.reduce((sum, v) => sum + v.likeCount, 0) || 0;
-  const totalComments = data?.recentVideos?.reduce((sum, v) => sum + v.commentCount, 0) || 0;
-
-  // Chart data for long-form videos
-  const longFormChartData = longFormVideos.slice(0, 10).map((video, i) => ({
-    name: `#${i + 1}`,
+  // Chart data for top long-form videos with actual titles
+  const topVideosChartData = data?.topPerformers?.longForm?.slice(0, 5).map((video) => ({
+    name: video.title.length > 25 ? video.title.substring(0, 25) + '...' : video.title,
     value: video.viewCount
-  }));
+  })) || [];
 
   return (
     <div className="space-y-8">
@@ -126,7 +134,7 @@ export default function YouTubePage() {
             <Youtube className="text-[#FF0000]" />
             YouTube Analytics
           </h1>
-          <p className="text-gray-400 mt-1">@PeoplesLeagueGolf | Live Data</p>
+          <p className="text-gray-400 mt-1">@PeoplesLeagueGolf</p>
         </div>
         {data?._meta?.generatedAt && (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border border-gray-700 rounded-full text-sm">
@@ -145,182 +153,222 @@ export default function YouTubePage() {
         )}
       </div>
 
-      {/* Primary Metric: Total Views */}
+      {/* PRIMARY METRIC: Lifetime Channel Views */}
       <div className="metric-card bg-gradient-to-r from-[#FF0000]/20 to-gray-800 border-2 border-[#FF0000]">
         <div className="flex items-center gap-3 mb-2">
           <Eye className="text-[#FF0000]" size={28} />
-          <h2 className="text-lg text-gray-300">Total YouTube Views</h2>
+          <h2 className="text-lg text-gray-300">Lifetime Channel Views</h2>
         </div>
         <div className="text-5xl font-bold text-white">
           {(data?.viewCount || 0).toLocaleString()}
         </div>
-        <p className="text-gray-400 mt-2">Lifetime channel views</p>
+        <p className="text-gray-400 mt-2">Total views across {data?.videoCount || 0} videos</p>
       </div>
 
-      {/* Summary Stats */}
+      {/* YTD Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Total Recent Views"
-          value={totalVideoViews}
-          change={`${data?.recentVideos?.length || 0} videos analyzed`}
+          label={`${currentYear} YTD Views`}
+          value={(ytd?.totalViews || 0).toLocaleString()}
+          change={`${ytd?.totalVideos || 0} videos posted`}
           changeType="positive"
           icon={<Eye size={20} className="text-[#FF0000]" />}
         />
         <MetricCard
-          label="Videos Published"
-          value={data?.videoCount || 0}
-          change="Total uploads"
-          changeType="neutral"
-          icon={<Play size={20} />}
-        />
-        <MetricCard
           label="Subscribers"
-          value={data?.subscriberCount || 0}
+          value={(data?.subscriberCount || 0).toLocaleString()}
           change="Current"
           changeType="neutral"
           icon={<Users size={20} />}
         />
         <MetricCard
-          label="Engagement Rate"
-          value={`${totalVideoViews > 0 ? ((totalLikes / totalVideoViews) * 100).toFixed(1) : 0}%`}
-          change="Likes per 100 views"
-          changeType="neutral"
-          icon={<TrendingUp size={20} />}
+          label={`${currentYear} Long-Form Views`}
+          value={(ytd?.longForm?.views || 0).toLocaleString()}
+          change={`${ytd?.longForm?.videoCount || 0} videos`}
+          changeType="positive"
+          icon={<Play size={20} />}
+        />
+        <MetricCard
+          label={`${currentYear} Shorts Views`}
+          value={(ytd?.shorts?.views || 0).toLocaleString()}
+          change={`${ytd?.shorts?.videoCount || 0} shorts`}
+          changeType="positive"
+          icon={<Play size={20} className="text-purple-500" />}
         />
       </div>
 
-      {/* Long-Form vs Shorts Comparison */}
+      {/* YTD Performance - Long-Form vs Shorts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Long-form Stats */}
+        {/* YTD Long-form Stats */}
         <div className="metric-card border-l-4 border-[#FF0000]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Play size={20} className="text-[#FF0000]" />
-              Long-Form Videos
+              {currentYear} YTD Long-Form
             </h3>
-            <span className="text-sm text-gray-500">{longFormVideos.length} videos</span>
+            <span className="text-sm text-gray-500">{ytd?.longForm?.videoCount || 0} videos</span>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-400">Total Views</span>
-              <span className="font-bold text-white">{longFormViews.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Avg Views/Video</span>
-              <span className="font-bold text-brand-lime">{avgLongFormViews.toLocaleString()}</span>
+              <span className="font-bold text-white">{(ytd?.longForm?.views || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Total Likes</span>
-              <span className="font-bold">{longFormLikes.toLocaleString()}</span>
+              <span className="font-bold">{(ytd?.longForm?.likes || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Total Comments</span>
-              <span className="font-bold">{longFormComments.toLocaleString()}</span>
+              <span className="font-bold">{(ytd?.longForm?.comments || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Engagement Rate</span>
               <span className="font-bold text-brand-lime">
-                {longFormViews > 0 ? ((longFormLikes / longFormViews) * 100).toFixed(2) : 0}%
+                {ytd?.longForm?.views ? ((ytd.longForm.likes / ytd.longForm.views) * 100).toFixed(2) : 0}%
               </span>
             </div>
           </div>
         </div>
 
-        {/* Shorts Stats */}
+        {/* YTD Shorts Stats */}
         <div className="metric-card border-l-4 border-purple-500">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Play size={20} className="text-purple-500" />
-              YouTube Shorts
+              {currentYear} YTD Shorts
             </h3>
-            <span className="text-sm text-gray-500">{shortsVideos.length} shorts</span>
+            <span className="text-sm text-gray-500">{ytd?.shorts?.videoCount || 0} shorts</span>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-400">Total Views</span>
-              <span className="font-bold text-white">{shortsViews.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Avg Views/Short</span>
-              <span className="font-bold text-purple-400">{avgShortsViews.toLocaleString()}</span>
+              <span className="font-bold text-white">{(ytd?.shorts?.views || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Total Likes</span>
-              <span className="font-bold">{shortsLikes.toLocaleString()}</span>
+              <span className="font-bold">{(ytd?.shorts?.likes || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Total Comments</span>
-              <span className="font-bold">{shortsComments.toLocaleString()}</span>
+              <span className="font-bold">{(ytd?.shorts?.comments || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Engagement Rate</span>
               <span className="font-bold text-purple-400">
-                {shortsViews > 0 ? ((shortsLikes / shortsViews) * 100).toFixed(2) : 0}%
+                {ytd?.shorts?.views ? ((ytd.shorts.likes / ytd.shorts.views) * 100).toFixed(2) : 0}%
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Long-Form Videos Chart */}
-      {longFormChartData.length > 0 && (
+      {/* Lifetime Stats (from analyzed videos) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Long-Form Video Performance</h3>
-          <SimpleChart data={longFormChartData} color="#FF0000" type="bar" />
-        </div>
-      )}
-
-      {/* Long-Form Videos List */}
-      <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Play size={20} className="text-[#FF0000]" />
-          Long-Form Videos (by Views)
-        </h3>
-        <div className="space-y-4">
-          {longFormVideos.sort((a, b) => b.viewCount - a.viewCount).slice(0, 15).map((video, index) => (
-            <div
-              key={video.id}
-              className="flex gap-4 p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="flex items-center justify-center w-8 h-8 bg-[#FF0000] rounded-full text-sm font-bold">
-                {index + 1}
-              </div>
-              <img
-                src={video.thumbnail}
-                alt={video.title}
-                className="w-32 h-20 object-cover rounded"
-              />
-              <div className="flex-1">
-                <h4 className="font-medium text-white line-clamp-2">{video.title}</h4>
-                <p className="text-sm text-gray-400 mt-1">
-                  {new Date(video.publishedAt).toLocaleDateString()} • {video.durationSeconds ? formatDuration(video.durationSeconds) : ''}
-                </p>
-                <div className="flex gap-4 mt-2 text-sm">
-                  <span className="flex items-center gap-1 text-brand-lime font-semibold">
-                    <Eye size={14} /> {video.viewCount.toLocaleString()}
-                  </span>
-                  <span className="flex items-center gap-1 text-gray-400">
-                    <ThumbsUp size={14} /> {video.likeCount.toLocaleString()}
-                  </span>
-                  <span className="flex items-center gap-1 text-gray-400">
-                    <MessageSquare size={14} /> {video.commentCount.toLocaleString()}
-                  </span>
-                </div>
-              </div>
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp size={20} className="text-gray-400" />
+            Recent Long-Form Performance
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">Based on {lifetime?.longForm?.videoCount || 0} most recent long-form videos</p>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Views</span>
+              <span className="font-bold text-white">{(lifetime?.longForm?.views || 0).toLocaleString()}</span>
             </div>
-          ))}
+            <div className="flex justify-between">
+              <span className="text-gray-400">Avg Views/Video</span>
+              <span className="font-bold text-brand-lime">{(lifetime?.longForm?.avgViews || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Engagement</span>
+              <span className="font-bold">{((lifetime?.longForm?.likes || 0) + (lifetime?.longForm?.comments || 0)).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp size={20} className="text-purple-400" />
+            Recent Shorts Performance
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">Based on {lifetime?.shorts?.videoCount || 0} most recent shorts</p>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Views</span>
+              <span className="font-bold text-white">{(lifetime?.shorts?.views || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Avg Views/Short</span>
+              <span className="font-bold text-purple-400">{(lifetime?.shorts?.avgViews || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Engagement</span>
+              <span className="font-bold">{((lifetime?.shorts?.likes || 0) + (lifetime?.shorts?.comments || 0)).toLocaleString()}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Shorts List */}
-      {shortsVideos.length > 0 && (
+      {/* Top Long-Form Videos Chart */}
+      {topVideosChartData.length > 0 && (
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4">Top 5 Long-Form Videos by Views</h3>
+          <SimpleChart data={topVideosChartData} color="#FF0000" type="bar" />
+        </div>
+      )}
+
+      {/* Top Performing Long-Form Videos List */}
+      {data?.topPerformers?.longForm && data.topPerformers.longForm.length > 0 && (
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Play size={20} className="text-[#FF0000]" />
+            Top Performing Long-Form Videos
+          </h3>
+          <div className="space-y-4">
+            {data.topPerformers.longForm.slice(0, 10).map((video, index) => (
+              <div
+                key={video.id}
+                className="flex gap-4 p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
+              >
+                <div className="flex items-center justify-center w-8 h-8 bg-[#FF0000] rounded-full text-sm font-bold">
+                  {index + 1}
+                </div>
+                <img
+                  src={video.thumbnail}
+                  alt={video.title}
+                  className="w-32 h-20 object-cover rounded"
+                />
+                <div className="flex-1">
+                  <h4 className="font-medium text-white line-clamp-2">{video.title}</h4>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {new Date(video.publishedAt).toLocaleDateString()} • {video.durationSeconds ? formatDuration(video.durationSeconds) : ''}
+                  </p>
+                  <div className="flex gap-4 mt-2 text-sm">
+                    <span className="flex items-center gap-1 text-brand-lime font-semibold">
+                      <Eye size={14} /> {video.viewCount.toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-1 text-gray-400">
+                      <ThumbsUp size={14} /> {video.likeCount.toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-1 text-gray-400">
+                      <MessageSquare size={14} /> {video.commentCount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top Performing Shorts List */}
+      {data?.topPerformers?.shorts && data.topPerformers.shorts.length > 0 && (
         <div className="metric-card">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Play size={20} className="text-purple-500" />
-            YouTube Shorts (by Views)
+            Top Performing Shorts
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {shortsVideos.sort((a, b) => b.viewCount - a.viewCount).slice(0, 12).map((video, index) => (
+            {data.topPerformers.shorts.slice(0, 9).map((video, index) => (
               <div
                 key={video.id}
                 className="p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"

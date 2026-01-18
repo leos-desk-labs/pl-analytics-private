@@ -44,6 +44,17 @@ interface InstagramData {
     reels: number;
     allContent: number;
   };
+  ytd: {
+    year: number;
+    reelCount: number;
+    views: number;
+    reach: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    saves: number;
+    avgViewsPerReel: number;
+  };
   allTimeStats: {
     totalLikes: number;
     totalComments: number;
@@ -129,6 +140,8 @@ export default function InstagramPage() {
 
   if (!data) return null;
 
+  const currentYear = data.ytd?.year || new Date().getFullYear();
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -157,11 +170,11 @@ export default function InstagramPage() {
         )}
       </div>
 
-      {/* PRIMARY METRIC: TOTAL VIEWS */}
+      {/* PRIMARY METRIC: LIFETIME TOTAL VIEWS */}
       <div className="metric-card bg-gradient-to-r from-[#E4405F]/20 to-gray-800 border-2 border-[#E4405F]">
         <div className="flex items-center gap-3 mb-2">
           <Play className="text-[#E4405F]" size={28} />
-          <h2 className="text-lg text-gray-300">Total Reel Views</h2>
+          <h2 className="text-lg text-gray-300">Lifetime Reel Views</h2>
         </div>
         <div className="text-5xl font-bold text-white">
           {data.totalViews.reels.toLocaleString()}
@@ -169,36 +182,113 @@ export default function InstagramPage() {
         <p className="text-gray-400 mt-2">Across {data.reelsPerformance.totalReels} Reels</p>
       </div>
 
-      {/* Key Metrics Grid */}
+      {/* YTD Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Total Views"
-          value={data.totalViews.reels.toLocaleString()}
-          change="All Reels"
+          label={`${currentYear} YTD Views`}
+          value={(data.ytd?.views || 0).toLocaleString()}
+          change={`${data.ytd?.reelCount || 0} reels posted`}
           changeType="positive"
           icon={<Play size={20} className="text-[#E4405F]" />}
         />
         <MetricCard
-          label="Total Reach"
-          value={data.reelsPerformance.totalReach.toLocaleString()}
+          label={`${currentYear} YTD Reach`}
+          value={(data.ytd?.reach || 0).toLocaleString()}
           change="Unique accounts"
           changeType="positive"
           icon={<Eye size={20} />}
         />
         <MetricCard
-          label="Watch Time"
-          value={`${data.reelsPerformance.totalWatchTimeHours.toLocaleString()}h`}
-          change={`Avg ${data.reelsPerformance.avgWatchTimeSec}s/view`}
-          changeType="positive"
-          icon={<Clock size={20} />}
+          label="Followers"
+          value={data.account.followers.toLocaleString()}
+          change="Current"
+          changeType="neutral"
+          icon={<Users size={20} />}
         />
         <MetricCard
-          label="Engagement Rate"
+          label="Avg Engagement Rate"
           value={data.reelsPerformance.avgEngagementRate}
-          change="Across all Reels"
+          change="All Reels"
           changeType="positive"
           icon={<TrendingUp size={20} />}
         />
+      </div>
+
+      {/* YTD vs Lifetime Comparison */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* YTD Stats */}
+        <div className="metric-card border-l-4 border-[#E4405F]">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Play size={20} className="text-[#E4405F]" />
+              {currentYear} YTD Performance
+            </h3>
+            <span className="text-sm text-gray-500">{data.ytd?.reelCount || 0} reels</span>
+          </div>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Views</span>
+              <span className="font-bold text-white">{(data.ytd?.views || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Avg Views/Reel</span>
+              <span className="font-bold text-brand-lime">{(data.ytd?.avgViewsPerReel || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Likes</span>
+              <span className="font-bold">{(data.ytd?.likes || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Comments</span>
+              <span className="font-bold">{(data.ytd?.comments || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Shares</span>
+              <span className="font-bold">{(data.ytd?.shares || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Saves</span>
+              <span className="font-bold">{(data.ytd?.saves || 0).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Lifetime Stats */}
+        <div className="metric-card border-l-4 border-gray-500">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingUp size={20} className="text-gray-400" />
+              Lifetime Performance
+            </h3>
+            <span className="text-sm text-gray-500">{data.reelsPerformance.totalReels} reels</span>
+          </div>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Views</span>
+              <span className="font-bold text-white">{data.reelsPerformance.totalViews.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Avg Views/Reel</span>
+              <span className="font-bold text-brand-lime">{data.reelsPerformance.avgViewsPerReel.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Likes</span>
+              <span className="font-bold">{data.allTimeStats.totalLikes.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Comments</span>
+              <span className="font-bold">{data.allTimeStats.totalComments.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Shares</span>
+              <span className="font-bold">{data.allTimeStats.totalShares.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Saves</span>
+              <span className="font-bold">{data.allTimeStats.totalSaves.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Today's Performance */}
@@ -220,18 +310,27 @@ export default function InstagramPage() {
         </div>
       </div>
 
-      {/* Content Breakdown & Followers */}
+      {/* Watch Time & Content Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Clock size={20} className="text-gray-400" />
+            Watch Time
+          </h3>
+          <div className="text-4xl font-bold text-white">{data.reelsPerformance.totalWatchTimeHours.toLocaleString()}h</div>
+          <p className="text-gray-400 mt-2">Total watch time across all Reels</p>
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Avg Watch Time/View</span>
+              <span className="font-bold text-brand-lime">{data.reelsPerformance.avgWatchTimeSec}s</span>
+            </div>
+          </div>
+        </div>
         <div className="metric-card">
           <div className="flex items-center gap-2 mb-4">
             <Users size={20} className="text-gray-400" />
-            <h3 className="text-lg font-semibold">Followers</h3>
+            <h3 className="text-lg font-semibold">Content Library</h3>
           </div>
-          <div className="text-4xl font-bold text-white">{data.account.followers.toLocaleString()}</div>
-          <p className="text-gray-400 mt-2">Total followers</p>
-        </div>
-        <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Content Library</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-2xl font-bold text-brand-lime">{data.contentBreakdown.reels}</div>
@@ -252,7 +351,7 @@ export default function InstagramPage() {
 
       {/* All-Time Engagement */}
       <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4">All-Time Engagement</h3>
+        <h3 className="text-lg font-semibold mb-4">Lifetime Engagement</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           <div>
             <Heart className="mx-auto mb-2 text-red-400" size={24} />
@@ -277,42 +376,24 @@ export default function InstagramPage() {
         </div>
       </div>
 
-      {/* Reels Performance Summary */}
-      <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4">Reels Performance Summary</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div>
-            <p className="text-gray-400 mb-1">Total Reels</p>
-            <div className="text-3xl font-bold text-brand-lime">{data.reelsPerformance.totalReels}</div>
-          </div>
-          <div>
-            <p className="text-gray-400 mb-1">Total Views</p>
-            <div className="text-3xl font-bold text-white">{data.reelsPerformance.totalViews.toLocaleString()}</div>
-          </div>
-          <div>
-            <p className="text-gray-400 mb-1">Avg Views/Reel</p>
-            <div className="text-3xl font-bold text-white">{data.reelsPerformance.avgViewsPerReel.toLocaleString()}</div>
-          </div>
-          <div>
-            <p className="text-gray-400 mb-1">Avg Engagement</p>
-            <div className="text-3xl font-bold text-brand-lime">{data.reelsPerformance.avgEngagementRate}</div>
-          </div>
-        </div>
-      </div>
-
       {/* Best Performers */}
       <div className="metric-card">
         <h3 className="text-lg font-semibold mb-4 text-green-400">Top Performing Reels (by Views)</h3>
         <div className="space-y-3">
-          {data.reelsPerformance.bestPerformers.slice(0, 5).map((reel) => (
+          {data.reelsPerformance.bestPerformers.slice(0, 5).map((reel, index) => (
             <div key={reel.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex-1">
-                <p className="text-sm text-gray-300 truncate max-w-md">
-                  {reel.caption || 'No caption'}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date(reel.timestamp).toLocaleDateString()}
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-6 h-6 bg-[#E4405F] rounded-full text-xs font-bold">
+                  {index + 1}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-300 truncate max-w-md">
+                    {reel.caption || 'No caption'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(reel.timestamp).toLocaleDateString()}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
@@ -345,7 +426,7 @@ export default function InstagramPage() {
       <div className="metric-card">
         <h3 className="text-lg font-semibold mb-4 text-yellow-400">Needs Improvement (Lowest Views)</h3>
         <div className="space-y-3">
-          {data.reelsPerformance.needsImprovement.map((reel) => (
+          {data.reelsPerformance.needsImprovement.map((reel, index) => (
             <div key={reel.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
               <div className="flex-1">
                 <p className="text-sm text-gray-300 truncate max-w-md">

@@ -175,6 +175,17 @@ export async function GET() {
       ? allReelInsights.reduce((sum, r) => sum + r.insights.avgWatchTimeMs, 0) / allReelInsights.length
       : 0;
 
+    // 7.5 Calculate YTD stats (Year-to-Date)
+    const now = new Date();
+    const ytdStart = new Date(now.getFullYear(), 0, 1); // Jan 1st
+    const ytdReels = allReelInsights.filter(r => new Date(r.timestamp) >= ytdStart);
+    const ytdViews = ytdReels.reduce((sum, r) => sum + r.insights.views, 0);
+    const ytdReach = ytdReels.reduce((sum, r) => sum + r.insights.reach, 0);
+    const ytdShares = ytdReels.reduce((sum, r) => sum + r.insights.shares, 0);
+    const ytdSaves = ytdReels.reduce((sum, r) => sum + r.insights.saved, 0);
+    const ytdLikes = ytdReels.reduce((sum, r) => sum + r.like_count, 0);
+    const ytdComments = ytdReels.reduce((sum, r) => sum + r.comments_count, 0);
+
     // 8. Sort and get top/bottom performers
     const sortedByViews = [...allReelInsights].sort((a, b) => b.insights.views - a.insights.views);
     const topPerformers = sortedByViews.slice(0, 10);
@@ -232,6 +243,19 @@ export async function GET() {
         reels: totalReelViews,
         // Images and carousels don't have views in the same way
         allContent: totalReelViews, // For now, total views = reel views
+      },
+
+      // YTD Stats (Year-to-Date)
+      ytd: {
+        year: now.getFullYear(),
+        reelCount: ytdReels.length,
+        views: ytdViews,
+        reach: ytdReach,
+        likes: ytdLikes,
+        comments: ytdComments,
+        shares: ytdShares,
+        saves: ytdSaves,
+        avgViewsPerReel: ytdReels.length > 0 ? Math.round(ytdViews / ytdReels.length) : 0,
       },
 
       // Aggregate Stats (All Content)
