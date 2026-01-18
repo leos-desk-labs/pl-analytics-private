@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
 import SimpleChart from '@/components/SimpleChart';
-import { Facebook, Eye, Heart, Users, Play, Share2, MessageCircle, TrendingUp, BarChart3 } from 'lucide-react';
+import { Facebook, Heart, Users, Play, TrendingUp, BarChart3 } from 'lucide-react';
 
 interface TopVideo {
   id: string;
@@ -142,51 +142,51 @@ export default function FacebookPage() {
           <p className="text-gray-400 mt-1">{data?.pageName}</p>
         </div>
         <div className="text-right">
-          <span className="px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400">
-            Lifetime Data
+          <span className="px-3 py-1 rounded-full text-sm bg-brand-lime/20 text-brand-lime">
+            {data?.ytd?.year || new Date().getFullYear()} YTD
           </span>
           <p className="text-xs text-gray-500 mt-1">
-            {data?._meta?.videosAnalyzed} videos, {data?._meta?.postsAnalyzed} posts analyzed
+            {data?._meta?.videosAnalyzed} videos analyzed
           </p>
         </div>
       </div>
 
-      {/* Primary Metric: Lifetime Video Views */}
+      {/* PRIMARY: 2026 YTD Performance Hero */}
       <div className="metric-card bg-gradient-to-r from-[#1877F2]/20 to-gray-800 border-2 border-[#1877F2]">
         <div className="flex items-center gap-3 mb-2">
           <Play className="text-[#1877F2]" size={28} />
-          <h2 className="text-lg text-gray-300">Lifetime Video Views</h2>
+          <h2 className="text-lg text-gray-300">{data?.ytd?.year || new Date().getFullYear()} YTD Video Views</h2>
         </div>
-        <div className="text-5xl font-bold text-white">
-          {lifetime?.videoViews?.toLocaleString() || '0'}
+        <div className="text-5xl font-bold text-brand-lime">
+          {data?.ytd?.videoViews?.toLocaleString() || '0'}
         </div>
         <p className="text-gray-400 mt-2">
-          Across {lifetime?.videoCount || 0} videos ({lifetime?.avgViewsPerVideo?.toLocaleString() || 0} avg per video)
+          {data?.ytd?.videoCount || 0} videos posted in {data?.ytd?.year || new Date().getFullYear()}
         </p>
       </div>
 
-      {/* Key Lifetime Metrics Grid */}
+      {/* 2026 YTD Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Total Video Views"
-          value={lifetime?.videoViews?.toLocaleString() || '0'}
-          change="Lifetime"
+          label="YTD Video Views"
+          value={data?.ytd?.videoViews?.toLocaleString() || '0'}
+          change={`${data?.ytd?.year || new Date().getFullYear()}`}
           changeType="positive"
           icon={<Play size={20} className="text-[#1877F2]" />}
         />
         <MetricCard
-          label="Total Engagements"
-          value={lifetime?.totalEngagements?.toLocaleString() || '0'}
-          change="Lifetime"
+          label="YTD Videos Posted"
+          value={String(data?.ytd?.videoCount || 0)}
+          change={`${data?.ytd?.year || new Date().getFullYear()}`}
           changeType="positive"
-          icon={<Heart size={20} />}
+          icon={<BarChart3 size={20} />}
         />
         <MetricCard
-          label="Engagement Rate"
-          value={`${engagementRate}%`}
-          change="Per follower"
+          label="Recent Engagements"
+          value={data?.rolling28Day?.engagements?.toLocaleString() || '0'}
+          change="Last 28 days"
           changeType="positive"
-          icon={<TrendingUp size={20} />}
+          icon={<Heart size={20} />}
         />
         <MetricCard
           label="Followers"
@@ -197,58 +197,42 @@ export default function FacebookPage() {
         />
       </div>
 
-      {/* Lifetime Engagement Breakdown */}
-      <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <BarChart3 size={20} className="text-[#1877F2]" />
-          Lifetime Engagement Breakdown
-        </h3>
-        <div className="grid grid-cols-3 gap-6 text-center">
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <Heart className="mx-auto mb-2 text-red-400" size={28} />
-            <div className="text-3xl font-bold text-white">{lifetime?.reactions?.toLocaleString() || '0'}</div>
-            <p className="text-sm text-gray-400 mt-1">Reactions</p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <MessageCircle className="mx-auto mb-2 text-blue-400" size={28} />
-            <div className="text-3xl font-bold text-white">{lifetime?.comments?.toLocaleString() || '0'}</div>
-            <p className="text-sm text-gray-400 mt-1">Comments</p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <Share2 className="mx-auto mb-2 text-green-400" size={28} />
-            <div className="text-3xl font-bold text-white">{lifetime?.shares?.toLocaleString() || '0'}</div>
-            <p className="text-sm text-gray-400 mt-1">Shares</p>
-          </div>
-        </div>
-      </div>
-
-      {/* YTD Performance */}
+      {/* Lifetime Stats (Secondary) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="metric-card bg-gradient-to-r from-[#1877F2]/10 to-gray-800">
-          <h3 className="text-lg font-semibold mb-4">{data?.ytd?.year || new Date().getFullYear()} YTD Performance</h3>
+        <div className="metric-card">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp size={20} className="text-gray-400" />
+            Lifetime Performance
+          </h3>
           <div className="space-y-4">
             <div>
-              <p className="text-gray-400 mb-1">YTD Video Views</p>
-              <div className="text-3xl font-bold text-brand-lime">
-                {data?.ytd?.videoViews?.toLocaleString() || '0'}
+              <p className="text-gray-400 mb-1">Total Video Views (All Time)</p>
+              <div className="text-3xl font-bold text-white">
+                {lifetime?.videoViews?.toLocaleString() || '0'}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                {data?.ytd?.videoCount || 0} videos posted this year
+                Across {lifetime?.videoCount || 0} videos
               </p>
             </div>
             <div>
-              <p className="text-gray-400 mb-1">Recent Engagements (28d)</p>
+              <p className="text-gray-400 mb-1">Total Engagements (All Time)</p>
               <div className="text-2xl font-bold text-white">
-                {data?.rolling28Day?.engagements?.toLocaleString() || '0'}
+                {lifetime?.totalEngagements?.toLocaleString() || '0'}
+              </div>
+            </div>
+            <div>
+              <p className="text-gray-400 mb-1">Avg Views per Video</p>
+              <div className="text-2xl font-bold text-brand-lime">
+                {lifetime?.avgViewsPerVideo?.toLocaleString() || '0'}
               </div>
             </div>
           </div>
         </div>
         <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Content Summary</h3>
+          <h3 className="text-lg font-semibold mb-4">Content Library</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Total Videos (Lifetime)</span>
+              <span className="text-gray-400">Total Videos</span>
               <span className="text-xl font-bold">{lifetime?.videoCount || 0}</span>
             </div>
             <div className="flex justify-between items-center">
@@ -256,12 +240,12 @@ export default function FacebookPage() {
               <span className="text-xl font-bold">{lifetime?.postCount || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Avg Views/Video</span>
-              <span className="text-xl font-bold text-brand-lime">{lifetime?.avgViewsPerVideo?.toLocaleString() || 0}</span>
+              <span className="text-gray-400">Page Views (28d)</span>
+              <span className="text-xl font-bold">{data?.rolling28Day?.pageViews?.toLocaleString() || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Page Views (Recent)</span>
-              <span className="text-xl font-bold">{data?.rolling28Day?.pageViews?.toLocaleString() || 0}</span>
+              <span className="text-gray-400">Engagement Rate</span>
+              <span className="text-xl font-bold text-brand-lime">{engagementRate}%</span>
             </div>
           </div>
         </div>
