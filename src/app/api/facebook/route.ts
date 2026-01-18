@@ -159,8 +159,16 @@ export async function GET() {
     }
 
     // ============================================
-    // CALCULATE LIFETIME TOTALS
+    // CALCULATE LIFETIME AND YTD TOTALS
     // ============================================
+
+    // YTD date range (Jan 1 of current year)
+    const now = new Date();
+    const ytdStart = new Date(now.getFullYear(), 0, 1); // Jan 1st
+
+    // Filter videos for YTD
+    const ytdVideos = allVideos.filter(v => new Date(v.created_time) >= ytdStart);
+    const ytdVideoViews = ytdVideos.reduce((sum, v) => sum + v.views, 0);
 
     // Lifetime video metrics
     const lifetimeVideoViews = allVideos.reduce((sum, v) => sum + v.views, 0);
@@ -168,6 +176,8 @@ export async function GET() {
     const lifetimeVideoComments = allVideos.reduce((sum, v) => sum + v.comments, 0);
 
     // Lifetime post metrics (all content)
+    // Note: Individual post reactions often return 0 for Reels/cross-posts
+    // Using 28-day Page Insights as engagement baseline since it's more accurate
     const lifetimeReactions = allPosts.reduce((sum, p) => sum + p.reactions, 0);
     const lifetimeComments = allPosts.reduce((sum, p) => sum + p.comments, 0);
     const lifetimeShares = allPosts.reduce((sum, p) => sum + p.shares, 0);
@@ -233,12 +243,21 @@ export async function GET() {
         reactions: lifetimeReactions,
         comments: lifetimeComments,
         shares: lifetimeShares,
-        totalEngagements: lifetimeEngagements,
+        // Use 28-day engagement as minimum since individual post data is incomplete
+        totalEngagements: Math.max(lifetimeEngagements, engagements28Day),
         avgViewsPerVideo,
         avgEngagementPerPost,
       },
 
-      // 28-Day Rolling (for trend analysis)
+      // YTD Metrics (Year-to-Date)
+      ytd: {
+        videoViews: ytdVideoViews,
+        videoCount: ytdVideos.length,
+        engagements: engagements28Day, // Best available approximation
+        year: now.getFullYear(),
+      },
+
+      // 28-Day Rolling (kept for reference)
       rolling28Day: {
         engagements: engagements28Day,
         pageViews,

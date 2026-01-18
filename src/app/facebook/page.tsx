@@ -43,6 +43,12 @@ interface FacebookData {
     engagements: number;
     pageViews: number;
   };
+  ytd: {
+    videoViews: number;
+    videoCount: number;
+    engagements: number;
+    year: number;
+  };
   topVideos: TopVideo[];
   topPosts: TopPost[];
   recentPosts: Array<{
@@ -216,21 +222,24 @@ export default function FacebookPage() {
         </div>
       </div>
 
-      {/* 28-Day Rolling vs Lifetime Comparison */}
+      {/* YTD Performance */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="metric-card bg-gradient-to-r from-[#1877F2]/10 to-gray-800">
-          <h3 className="text-lg font-semibold mb-4">28-Day Performance</h3>
+          <h3 className="text-lg font-semibold mb-4">{data?.ytd?.year || new Date().getFullYear()} YTD Performance</h3>
           <div className="space-y-4">
             <div>
-              <p className="text-gray-400 mb-1">Rolling Engagements</p>
+              <p className="text-gray-400 mb-1">YTD Video Views</p>
               <div className="text-3xl font-bold text-brand-lime">
-                {data?.rolling28Day?.engagements?.toLocaleString() || '0'}
+                {data?.ytd?.videoViews?.toLocaleString() || '0'}
               </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {data?.ytd?.videoCount || 0} videos posted this year
+              </p>
             </div>
             <div>
-              <p className="text-gray-400 mb-1">Page Views</p>
+              <p className="text-gray-400 mb-1">Recent Engagements (28d)</p>
               <div className="text-2xl font-bold text-white">
-                {data?.rolling28Day?.pageViews?.toLocaleString() || '0'}
+                {data?.rolling28Day?.engagements?.toLocaleString() || '0'}
               </div>
             </div>
           </div>
@@ -239,7 +248,7 @@ export default function FacebookPage() {
           <h3 className="text-lg font-semibold mb-4">Content Summary</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Total Videos</span>
+              <span className="text-gray-400">Total Videos (Lifetime)</span>
               <span className="text-xl font-bold">{lifetime?.videoCount || 0}</span>
             </div>
             <div className="flex justify-between items-center">
@@ -251,8 +260,8 @@ export default function FacebookPage() {
               <span className="text-xl font-bold text-brand-lime">{lifetime?.avgViewsPerVideo?.toLocaleString() || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Avg Engagement/Post</span>
-              <span className="text-xl font-bold text-brand-lime">{lifetime?.avgEngagementPerPost?.toLocaleString() || 0}</span>
+              <span className="text-gray-400">Page Views (Recent)</span>
+              <span className="text-xl font-bold">{data?.rolling28Day?.pageViews?.toLocaleString() || 0}</span>
             </div>
           </div>
         </div>
