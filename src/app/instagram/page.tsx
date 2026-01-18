@@ -170,19 +170,45 @@ export default function InstagramPage() {
         )}
       </div>
 
-      {/* PRIMARY METRIC: LIFETIME TOTAL VIEWS */}
+      {/* PRIMARY METRIC: 2026 YTD Views */}
       <div className="metric-card bg-gradient-to-r from-[#E4405F]/20 to-gray-800 border-2 border-[#E4405F]">
         <div className="flex items-center gap-3 mb-2">
           <Play className="text-[#E4405F]" size={28} />
-          <h2 className="text-lg text-gray-300">Lifetime Reel Views</h2>
+          <h2 className="text-lg text-gray-300">{currentYear} YTD Reel Views</h2>
         </div>
-        <div className="text-5xl font-bold text-white">
-          {data.totalViews.reels.toLocaleString()}
+        <div className="text-5xl font-bold text-brand-lime">
+          {(data.ytd?.views || 0).toLocaleString()}
         </div>
-        <p className="text-gray-400 mt-2">Across {data.reelsPerformance.totalReels} Reels</p>
+        <p className="text-gray-400 mt-2">{data.ytd?.reelCount || 0} reels posted in {currentYear}</p>
+
+        {/* YTD Breakdown */}
+        <div className="mt-6 pt-4 border-t border-gray-700">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-gray-500">YTD Reach</p>
+              <p className="text-lg font-bold text-white">{(data.ytd?.reach || 0).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">unique accounts</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">YTD Engagement</p>
+              <p className="text-lg font-bold text-white">{((data.ytd?.likes || 0) + (data.ytd?.comments || 0) + (data.ytd?.shares || 0)).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">likes + comments + shares</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Followers</p>
+              <p className="text-lg font-bold text-white">{data.account.followers.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">current</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Lifetime Views</p>
+              <p className="text-lg font-bold text-gray-400">{data.totalViews.reels.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">{data.reelsPerformance.totalReels} total reels</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* YTD Overview Cards */}
+      {/* YTD Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           label={`${currentYear} YTD Views`}
@@ -206,11 +232,11 @@ export default function InstagramPage() {
           icon={<Users size={20} />}
         />
         <MetricCard
-          label="Avg Engagement Rate"
-          value={data.reelsPerformance.avgEngagementRate}
-          change="All Reels"
-          changeType="positive"
-          icon={<TrendingUp size={20} />}
+          label="Lifetime Views"
+          value={data.totalViews.reels.toLocaleString()}
+          change={`${data.reelsPerformance.totalReels} total reels`}
+          changeType="neutral"
+          icon={<Eye size={20} className="text-gray-400" />}
         />
       </div>
 

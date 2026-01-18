@@ -93,7 +93,7 @@ export default function OverviewPage() {
         <p className="text-gray-400 mt-1">Peoples League Media Network Performance</p>
       </div>
 
-      {/* Primary Metric: Total Lifetime Views - Hero Display */}
+      {/* Primary Metric: 2026 YTD Views - Hero Display */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-brand-lime/30">
         {/* Subtle background glow */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-brand-lime/10 rounded-full blur-3xl" />
@@ -102,11 +102,11 @@ export default function OverviewPage() {
         <div className="relative p-8">
           {/* Main number - centered hero */}
           <div className="text-center mb-6">
-            <p className="text-gray-400 text-sm uppercase tracking-wider mb-3">Lifetime Views</p>
+            <p className="text-gray-400 text-sm uppercase tracking-wider mb-3">{currentYear} YTD Views</p>
             <div className="text-6xl md:text-7xl font-bold text-brand-lime tracking-tight">
-              {loading ? '...' : totalLifetimeViews.toLocaleString()}
+              {loading ? '...' : totalYtdViews.toLocaleString()}
             </div>
-            <p className="text-gray-500 text-sm mt-2">across all platforms</p>
+            <p className="text-gray-500 text-sm mt-2">{totalYtdContent} pieces of content across all platforms</p>
           </div>
 
           {/* Divider */}
@@ -114,13 +114,6 @@ export default function OverviewPage() {
 
           {/* Stats Row */}
           <div className="flex items-center justify-center gap-8 md:gap-12 text-center">
-            <div>
-              <div className="text-2xl md:text-3xl font-bold text-white">
-                {loading ? '...' : totalYtdViews.toLocaleString()}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">{currentYear} YTD</p>
-            </div>
-            <div className="w-px h-10 bg-gray-700" />
             <div>
               <div className="text-2xl md:text-3xl font-bold text-white">
                 {loading ? '...' : avgViewsPerDay.toLocaleString()}
@@ -133,6 +126,13 @@ export default function OverviewPage() {
                 {loading ? '...' : totalAudience.toLocaleString()}
               </div>
               <p className="text-xs text-gray-500 mt-1">total audience</p>
+            </div>
+            <div className="w-px h-10 bg-gray-700" />
+            <div>
+              <div className="text-2xl md:text-3xl font-bold text-gray-400">
+                {loading ? '...' : totalLifetimeViews.toLocaleString()}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">lifetime views</p>
             </div>
           </div>
         </div>

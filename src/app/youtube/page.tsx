@@ -153,53 +153,59 @@ export default function YouTubePage() {
         )}
       </div>
 
-      {/* PRIMARY METRIC: Lifetime Channel Views with Breakdown */}
+      {/* PRIMARY METRIC: 2026 YTD Views */}
       <div className="metric-card bg-gradient-to-r from-[#FF0000]/20 to-gray-800 border-2 border-[#FF0000]">
         <div className="flex items-center gap-3 mb-2">
-          <Eye className="text-[#FF0000]" size={28} />
-          <h2 className="text-lg text-gray-300">Lifetime Channel Views</h2>
+          <Play className="text-[#FF0000]" size={28} />
+          <h2 className="text-lg text-gray-300">{currentYear} YTD Views</h2>
         </div>
-        <div className="text-5xl font-bold text-white">
-          {(data?.viewCount || 0).toLocaleString()}
+        <div className="text-5xl font-bold text-brand-lime">
+          {(ytd?.totalViews || 0).toLocaleString()}
         </div>
-        <p className="text-gray-400 mt-2">Total views across {data?.videoCount || 0} videos</p>
+        <p className="text-gray-400 mt-2">{ytd?.totalVideos || 0} videos posted in {currentYear}</p>
 
-        {/* Lifetime Breakdown */}
+        {/* YTD Breakdown */}
         <div className="mt-6 pt-4 border-t border-gray-700">
-          <p className="text-sm text-gray-400 mb-3">Breakdown (from {data?._meta?.videosAnalyzed || 0} most recent videos analyzed):</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="text-xs text-gray-500">Long-Form Views</p>
-              <p className="text-lg font-bold text-white">{(lifetime?.longForm?.views || 0).toLocaleString()}</p>
-              <p className="text-xs text-gray-500">{lifetime?.longForm?.videoCount || 0} videos</p>
+              <p className="text-lg font-bold text-white">{(ytd?.longForm?.views || 0).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">{ytd?.longForm?.videoCount || 0} videos</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Shorts Views</p>
-              <p className="text-lg font-bold text-purple-400">{(lifetime?.shorts?.views || 0).toLocaleString()}</p>
-              <p className="text-xs text-gray-500">{lifetime?.shorts?.videoCount || 0} shorts</p>
+              <p className="text-lg font-bold text-purple-400">{(ytd?.shorts?.views || 0).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">{ytd?.shorts?.videoCount || 0} shorts</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Analyzed Total</p>
-              <p className="text-lg font-bold text-brand-lime">{((lifetime?.longForm?.views || 0) + (lifetime?.shorts?.views || 0)).toLocaleString()}</p>
-              <p className="text-xs text-gray-500">{(lifetime?.totalAnalyzedVideos || 0)} videos</p>
+              <p className="text-xs text-gray-500">Subscribers</p>
+              <p className="text-lg font-bold text-white">{(data?.subscriberCount || 0).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">current</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Older Content</p>
-              <p className="text-lg font-bold text-gray-400">{((data?.viewCount || 0) - (lifetime?.longForm?.views || 0) - (lifetime?.shorts?.views || 0)).toLocaleString()}</p>
-              <p className="text-xs text-gray-500">{(data?.videoCount || 0) - (lifetime?.totalAnalyzedVideos || 0)} videos</p>
+              <p className="text-xs text-gray-500">Lifetime Views</p>
+              <p className="text-lg font-bold text-gray-400">{(data?.viewCount || 0).toLocaleString()}</p>
+              <p className="text-xs text-gray-500">{data?.videoCount || 0} total videos</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* YTD Overview Cards */}
+      {/* YTD Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label={`${currentYear} YTD Views`}
-          value={(ytd?.totalViews || 0).toLocaleString()}
-          change={`${ytd?.totalVideos || 0} videos posted`}
+          label={`${currentYear} Long-Form`}
+          value={(ytd?.longForm?.views || 0).toLocaleString()}
+          change={`${ytd?.longForm?.videoCount || 0} videos`}
           changeType="positive"
-          icon={<Eye size={20} className="text-[#FF0000]" />}
+          icon={<Play size={20} className="text-[#FF0000]" />}
+        />
+        <MetricCard
+          label={`${currentYear} Shorts`}
+          value={(ytd?.shorts?.views || 0).toLocaleString()}
+          change={`${ytd?.shorts?.videoCount || 0} shorts`}
+          changeType="positive"
+          icon={<Play size={20} className="text-purple-500" />}
         />
         <MetricCard
           label="Subscribers"
@@ -209,18 +215,11 @@ export default function YouTubePage() {
           icon={<Users size={20} />}
         />
         <MetricCard
-          label={`${currentYear} Long-Form Views`}
-          value={(ytd?.longForm?.views || 0).toLocaleString()}
-          change={`${ytd?.longForm?.videoCount || 0} videos`}
-          changeType="positive"
-          icon={<Play size={20} />}
-        />
-        <MetricCard
-          label={`${currentYear} Shorts Views`}
-          value={(ytd?.shorts?.views || 0).toLocaleString()}
-          change={`${ytd?.shorts?.videoCount || 0} shorts`}
-          changeType="positive"
-          icon={<Play size={20} className="text-purple-500" />}
+          label="Lifetime Views"
+          value={(data?.viewCount || 0).toLocaleString()}
+          change={`${data?.videoCount || 0} total videos`}
+          changeType="neutral"
+          icon={<Eye size={20} className="text-gray-400" />}
         />
       </div>
 
