@@ -1,5 +1,8 @@
 'use client';
 
+// Force dynamic rendering - disable static page caching
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
 import SimpleChart from '@/components/SimpleChart';
