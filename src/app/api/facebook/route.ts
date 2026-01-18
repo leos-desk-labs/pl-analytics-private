@@ -39,54 +39,38 @@ export async function GET() {
       return NextResponse.json({ error: pageInfo.error.message }, { status: 400 });
     }
 
-    // Get Page Insights - using separate calls for different metric types
-    // Some metrics need 'day' period, others need 'days_28'
-    let impressions = 0;
-    let engagedUsers = 0;
+    // Get Page Insights - only using metrics valid in v24.0
+    // Note: page_impressions and page_engaged_users are deprecated
     let postEngagements = 0;
     let videoViews = 0;
     let pageViews = 0;
 
-    // Try fetching insights with valid v24.0 metrics
+    // Fetch insights with valid v24.0 metrics
     try {
-      // page_impressions and page_post_engagements with days_28 period
-      const insightsResponse1 = await fetch(
-        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_impressions,page_post_engagements&period=days_28&access_token=${pageAccessToken}`
+      // page_post_engagements with days_28 period (this metric still works)
+      const engagementsResponse = await fetch(
+        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_post_engagements&period=days_28&access_token=${pageAccessToken}`
       );
-      const insights1 = await insightsResponse1.json();
+      const engagementsData = await engagementsResponse.json();
 
-      if (insights1.data) {
-        insights1.data.forEach((metric: any) => {
-          const latestValue = metric.values?.[metric.values.length - 1]?.value || 0;
-          if (metric.name === 'page_impressions') impressions = latestValue;
-          if (metric.name === 'page_post_engagements') postEngagements = latestValue;
-        });
-      }
-
-      // page_views_total with day period
-      const insightsResponse2 = await fetch(
-        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_views_total&period=day&access_token=${pageAccessToken}`
-      );
-      const insights2 = await insightsResponse2.json();
-
-      if (insights2.data) {
-        // Sum up the last 28 days
-        const pageViewsMetric = insights2.data.find((m: any) => m.name === 'page_views_total');
-        if (pageViewsMetric?.values) {
-          pageViews = pageViewsMetric.values.reduce((sum: number, v: any) => sum + (v.value || 0), 0);
+      if (engagementsData.data) {
+        const engMetric = engagementsData.data.find((m: any) => m.name === 'page_post_engagements');
+        if (engMetric?.values?.length > 0) {
+          // Get the most recent value
+          postEngagements = engMetric.values[engMetric.values.length - 1]?.value || 0;
         }
       }
 
-      // page_fans_online (for engaged users approximation) with day period
-      const insightsResponse3 = await fetch(
-        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_engaged_users&period=day&access_token=${pageAccessToken}`
+      // page_views_total with day period
+      const viewsResponse = await fetch(
+        `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_views_total&period=day&access_token=${pageAccessToken}`
       );
-      const insights3 = await insightsResponse3.json();
+      const viewsData = await viewsResponse.json();
 
-      if (insights3.data) {
-        const engagedMetric = insights3.data.find((m: any) => m.name === 'page_engaged_users');
-        if (engagedMetric?.values) {
-          engagedUsers = engagedMetric.values.reduce((sum: number, v: any) => sum + (v.value || 0), 0);
+      if (viewsData.data) {
+        const pageViewsMetric = viewsData.data.find((m: any) => m.name === 'page_views_total');
+        if (pageViewsMetric?.values) {
+          pageViews = pageViewsMetric.values.reduce((sum: number, v: any) => sum + (v.value || 0), 0);
         }
       }
     } catch (insightErr) {
@@ -148,11 +132,10 @@ export async function GET() {
       pageLink: pageInfo.link,
       picture: pageInfo.picture?.data?.url,
       // Insights (last 28 days)
-      impressions,
-      reach: engagedUsers, // Using engaged users as a proxy for reach
+      // Note: impressions metric deprecated in v24.0, using post engagements instead
       videoViews: finalVideoViews,
       pageViews,
-      // Engagements
+      // Engagements (28 day rolling)
       engagements: postEngagements,
       totalLikes,
       totalComments,

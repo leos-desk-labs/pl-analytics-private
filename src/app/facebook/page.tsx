@@ -9,8 +9,6 @@ interface FacebookData {
   pageId: string;
   pageName: string;
   followers: number;
-  impressions: number;
-  reach: number;
   videoViews: number;
   pageViews: number;
   engagements: number;
@@ -55,7 +53,6 @@ export default function FacebookPage() {
     if (!data) return [];
     return [
       { name: 'Video Views', value: data.videoViews },
-      { name: 'Impressions', value: data.impressions },
       { name: 'Engagements', value: data.engagements },
       { name: 'Page Views', value: data.pageViews },
     ].filter(d => d.value > 0);
@@ -93,8 +90,9 @@ export default function FacebookPage() {
     );
   }
 
-  const engagementRate = data && data.reach > 0
-    ? ((data.engagements / data.reach) * 100).toFixed(2)
+  // Calculate engagement rate based on followers since reach metric is deprecated
+  const engagementRate = data && data.followers > 0
+    ? ((data.engagements / data.followers) * 100).toFixed(2)
     : '0.00';
 
   return (
@@ -134,25 +132,25 @@ export default function FacebookPage() {
           icon={<Play size={20} className="text-[#1877F2]" />}
         />
         <MetricCard
-          label="Page Reach"
-          value={data?.reach?.toLocaleString() || '0'}
-          change="Last 28 days"
-          changeType="positive"
-          icon={<TrendingUp size={20} />}
-        />
-        <MetricCard
-          label="Impressions"
-          value={data?.impressions?.toLocaleString() || '0'}
-          change="Last 28 days"
-          changeType="positive"
-          icon={<Eye size={20} />}
-        />
-        <MetricCard
           label="Engagements"
           value={data?.engagements?.toLocaleString() || '0'}
           change="Last 28 days"
           changeType="positive"
           icon={<Heart size={20} />}
+        />
+        <MetricCard
+          label="Page Views"
+          value={data?.pageViews?.toLocaleString() || '0'}
+          change="Last 28 days"
+          changeType="positive"
+          icon={<Eye size={20} />}
+        />
+        <MetricCard
+          label="Followers"
+          value={data?.followers?.toLocaleString() || '0'}
+          change="Total followers"
+          changeType="neutral"
+          icon={<Users size={20} />}
         />
       </div>
 
@@ -164,20 +162,20 @@ export default function FacebookPage() {
         </div>
       )}
 
-      {/* Engagement Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Page Views</h3>
-          <div className="text-4xl font-bold text-white">{data?.pageViews?.toLocaleString() || '0'}</div>
-          <p className="text-gray-400 mt-2">Last 28 days</p>
-        </div>
-        <div className="metric-card bg-gray-800/30">
-          <div className="flex items-center gap-2 mb-4">
-            <Users size={20} className="text-gray-400" />
-            <h3 className="text-lg font-semibold text-gray-400">Followers</h3>
+      {/* 28-Day Engagements Highlight */}
+      <div className="metric-card bg-gradient-to-r from-[#1877F2]/10 to-gray-800">
+        <h3 className="text-lg font-semibold mb-4">28-Day Performance</h3>
+        <div className="grid grid-cols-2 gap-8">
+          <div>
+            <p className="text-gray-400 mb-1">Total Engagements</p>
+            <div className="text-4xl font-bold text-brand-lime">{data?.engagements?.toLocaleString() || '0'}</div>
+            <p className="text-sm text-gray-500 mt-1">Likes, comments, shares, clicks</p>
           </div>
-          <div className="text-4xl font-bold text-white">{data?.followers?.toLocaleString() || '0'}</div>
-          <p className="text-gray-400 mt-2">Secondary metric</p>
+          <div>
+            <p className="text-gray-400 mb-1">Engagement Rate</p>
+            <div className="text-4xl font-bold text-brand-lime">{engagementRate}%</div>
+            <p className="text-sm text-gray-500 mt-1">Engagements per follower</p>
+          </div>
         </div>
       </div>
 
@@ -206,7 +204,7 @@ export default function FacebookPage() {
       {/* Views Performance */}
       {data && data.videoViews > 0 && (
         <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Views Performance</h3>
+          <h3 className="text-lg font-semibold mb-4">Video Performance</h3>
           <div className="grid grid-cols-2 gap-8">
             <div>
               <p className="text-gray-400 mb-1">Views per Follower</p>
@@ -214,13 +212,13 @@ export default function FacebookPage() {
                 {(data.videoViews / (data.followers || 1)).toFixed(1)}x
               </div>
               <p className="text-sm text-gray-500 mt-1">
-                Content reaches {(data.videoViews / (data.followers || 1)).toFixed(1)}x your follower count
+                Video content reaches {(data.videoViews / (data.followers || 1)).toFixed(1)}x your follower count
               </p>
             </div>
             <div>
-              <p className="text-gray-400 mb-1">Engagement Rate</p>
-              <div className="text-3xl font-bold text-brand-lime">{engagementRate}%</div>
-              <p className="text-sm text-gray-500 mt-1">Engagements per account reached</p>
+              <p className="text-gray-400 mb-1">Page Views</p>
+              <div className="text-3xl font-bold text-white">{data?.pageViews?.toLocaleString() || '0'}</div>
+              <p className="text-sm text-gray-500 mt-1">Profile visits (recent)</p>
             </div>
           </div>
         </div>
