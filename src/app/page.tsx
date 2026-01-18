@@ -32,16 +32,16 @@ export default function OverviewPage() {
   const youtubeLifetimeViews = youtubeData?.viewCount || 0;
   const youtubeRecentViews = youtubeData?.recentVideos?.reduce((sum: number, v: any) => sum + v.viewCount, 0) || 0;
 
-  // Instagram: impressions if available, otherwise interactions as engagement proxy
-  const instagramImpressions = instagramData?.impressions || 0;
-  const instagramReelsViews = instagramData?.reelsViews || 0;
-  const instagramInteractions = instagramData?.interactions || 0;
-  const instagramMetric = instagramImpressions || instagramReelsViews || instagramInteractions;
+  // Instagram: Use totalViews.reels from the API response (matches instagram/page.tsx structure)
+  // The API returns: { totalViews: { reels: number }, reelsPerformance: { totalViews: number }, todayStats: { interactions: number } }
+  const instagramReelsViews = instagramData?.totalViews?.reels || instagramData?.reelsPerformance?.totalViews || 0;
+  const instagramInteractions = instagramData?.todayStats?.interactions || 0;
+  const instagramMetric = instagramReelsViews || instagramInteractions;
 
-  // Facebook: impressions + video views
+  // Facebook: lifetime video views + impressions
+  const facebookVideoViews = facebookData?.lifetime?.videoViews || facebookData?.videoViews || 0;
   const facebookImpressions = facebookData?.impressions || 0;
-  const facebookVideoViews = facebookData?.videoViews || 0;
-  const facebookMetric = facebookImpressions + facebookVideoViews;
+  const facebookMetric = facebookVideoViews + facebookImpressions;
 
   // Total views = all content views across all platforms
   const totalViews = youtubeLifetimeViews + instagramMetric + facebookMetric;
@@ -133,7 +133,7 @@ export default function OverviewPage() {
           instagramViews={instagramMetric}
           facebookViews={facebookMetric}
           youtubeSubscribers={youtubeData?.subscriberCount || 0}
-          instagramFollowers={instagramData?.followers || 0}
+          instagramFollowers={instagramData?.account?.followers || instagramData?.followers || 0}
           facebookFollowers={facebookData?.followers || 0}
         />
       )}
@@ -196,12 +196,12 @@ export default function OverviewPage() {
             {instagramMetric ? instagramMetric.toLocaleString() : '--'}
           </div>
           <p className="text-sm text-gray-400">
-            {instagramImpressions ? 'Impressions' : instagramReelsViews ? 'Reels Views' : 'Interactions'}
+            {instagramReelsViews ? 'Reels Views' : 'Interactions'}
           </p>
           {instagramData && (
             <div className="mt-2 pt-2 border-t border-gray-700">
               <span className="text-sm text-gray-500">Followers: </span>
-              <span className="text-sm text-white">{instagramData.followers?.toLocaleString()}</span>
+              <span className="text-sm text-white">{(instagramData.account?.followers || instagramData.followers)?.toLocaleString()}</span>
             </div>
           )}
         </div>
@@ -287,7 +287,7 @@ export default function OverviewPage() {
           </div>
           <div>
             <Instagram className="text-[#E4405F] mx-auto mb-2" size={20} />
-            <div className="text-xl font-bold">{instagramData?.followers?.toLocaleString() || '--'}</div>
+            <div className="text-xl font-bold">{(instagramData?.account?.followers || instagramData?.followers)?.toLocaleString() || '--'}</div>
             <p className="text-xs text-gray-500">Followers</p>
           </div>
           <div>

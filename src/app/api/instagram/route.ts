@@ -65,7 +65,26 @@ export async function GET() {
     const igInfo = await igInfoResponse.json();
 
     if (igInfo.error) {
-      return NextResponse.json({ error: igInfo.error.message }, { status: 400 });
+      // Check if it's a token expiration error
+      const errorMessage = igInfo.error.message || 'Unknown error';
+      const isExpired = errorMessage.toLowerCase().includes('expired') ||
+                        errorMessage.toLowerCase().includes('session') ||
+                        igInfo.error.code === 190;
+
+      if (isExpired) {
+        // Parse expiration time from error message if available
+        const expirationMatch = errorMessage.match(/expired on ([^.]+)/i);
+        const expirationTime = expirationMatch ? expirationMatch[1] : 'unknown time';
+        const now = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+
+        return NextResponse.json({
+          error: `Error validating access token: Session has expired on ${expirationTime}. The current time is ${now}.`,
+          tokenExpired: true,
+          needsReauthorization: true
+        }, { status: 401 });
+      }
+
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
     // 2. Get account-level insights
