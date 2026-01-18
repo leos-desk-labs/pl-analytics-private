@@ -67,8 +67,8 @@ export async function GET() {
     let videoNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,created_time,length,views,likes.summary(true),comments.summary(true)&limit=100&access_token=${pageAccessToken}`;
 
     while (videoNextUrl) {
-      const videoResponse = await fetch(videoNextUrl);
-      const videoData = await videoResponse.json();
+      const videoResponse: Response = await fetch(videoNextUrl);
+      const videoData: any = await videoResponse.json();
 
       if (videoData.data) {
         videoData.data.forEach((video: any) => {
@@ -93,8 +93,8 @@ export async function GET() {
     let postNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,shares,reactions.summary(total_count),comments.summary(total_count)&limit=100&access_token=${pageAccessToken}`;
 
     while (postNextUrl) {
-      const postResponse = await fetch(postNextUrl);
-      const postData = await postResponse.json();
+      const postResponse: Response = await fetch(postNextUrl);
+      const postData: any = await postResponse.json();
 
       if (postData.data) {
         postData.data.forEach((post: any) => {
