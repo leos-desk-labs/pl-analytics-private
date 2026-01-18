@@ -1,0 +1,50 @@
+{
+  "account": {
+    "handle": "@peoples.league",
+    "platform": "tiktok",
+    "status": "dormant",
+    "description": "Legacy Peoples League TikTok account used in 2025",
+    "followers": 985,
+    "totalLikes": 21325,
+    "videoCount": 186
+  },
+  "dataCollectedAt": "2026-01-17",
+  "dataSource": "manual_scrape",
+  "note": "Historical data scraped from public TikTok profile. No API access available for this account.",
+  "metrics": {
+    "totalViews": 730204,
+    "totalLikes": 21325,
+    "videoCount": 174,
+    "avgViewsPerVideo": 4197,
+    "note": "174 videos captured from scroll, account shows 186 total - some may not have loaded"
+  },
+  "videoViews": [
+    741, 2427, 4152, 1006, 1444, 1406, 1079, 16300, 4073, 1387, 4394, 1754,
+    2260, 2448, 7450, 468, 1811, 140, 306, 1522, 1397, 22200, 8665, 994,
+    17600, 1604, 4178, 28100, 1245, 4706, 4919, 1247, 1026, 393, 1257, 1970,
+    6503, 5555, 1013, 1530, 435, 1252, 1780, 17600, 1698, 3040, 4028, 20500,
+    4181, 356, 365, 1069, 11500, 1960, 2421, 4543, 1594, 1141, 1327, 492,
+    226, 16100, 1365, 2664, 1358, 2999, 259, 1233, 1267, 254, 2862, 12600,
+    1051, 1074, 1137, 1135, 3030, 1255, 1167, 3872, 6187, 1275, 973, 1043,
+    990, 1289, 1186, 1716, 1212, 22300, 318, 1185, 5779, 478, 4624, 1083,
+    70, 1994, 60, 999, 3072, 979, 1025, 944, 1152, 935, 913, 965,
+    1019, 1496, 1679, 2095, 840, 249, 368, 1707, 33600, 2397, 1333, 1421,
+    1042, 759, 994, 1469, 1231, 967, 1110, 1364, 1056, 1139, 958, 575,
+    197, 368, 3781, 945, 2659, 262, 1307, 2239, 213500, 1037, 1494, 1996,
+    474, 1034, 939, 1015, 1126, 1372, 1541, 1507, 365, 439, 363, 1247,
+    464, 1112, 523, 36900, 984, 1714, 1472, 1171, 1703, 3201, 441, 558,
+    487, 418, 370, 594, 218, 193
+  ],
+  "topPerformers": [
+    {"views": 213500, "description": "Ja Rule 60 seconds video"},
+    {"views": 36900, "description": "Get to know Alexa Melton"},
+    {"views": 33600, "description": "Best golf celebration"},
+    {"views": 28100, "description": "Account highlight"},
+    {"views": 22300, "description": "Golf opponents too likeable"},
+    {"views": 22200, "description": "Team photo video"},
+    {"views": 20500, "description": "IT WAS INCREDIBLE collab"},
+    {"views": 17600, "description": "Cart cam comedy"},
+    {"views": 17600, "description": "OH MY video"},
+    {"views": 16300, "description": "Early viral video"}
+  ]
+}
