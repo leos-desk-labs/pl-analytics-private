@@ -11,6 +11,7 @@ export async function GET() {
   try {
     let pageId: string;
     let pageAccessToken: string;
+    let pageName: string = 'Unknown';
 
     // Try to get page access token from User token first
     const pagesResponse = await fetch(
@@ -28,10 +29,12 @@ export async function GET() {
 
       pageId = plPage.id;
       pageAccessToken = plPage.access_token;
+      pageName = plPage.name;
     } else if (META_PAGE_ID) {
       // Fallback: Token is already a Page Access Token
       pageId = META_PAGE_ID;
       pageAccessToken = META_ACCESS_TOKEN;
+      pageName = 'Peoples League (Page Token)';
     } else {
       return NextResponse.json({ error: 'No page found', details: pagesData.error }, { status: 400 });
     }
@@ -103,7 +106,7 @@ export async function GET() {
 
     return NextResponse.json({
       pageId,
-      pageName: plPage.name,
+      pageName,
       hasPageAccessToken: !!pageAccessToken,
       tokenPermissions: tokenDebug.data?.scopes || [],
       insightsTests: insightsData,

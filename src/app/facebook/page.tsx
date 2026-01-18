@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
 import SimpleChart from '@/components/SimpleChart';
-import { Facebook, Heart, Users, Play, TrendingUp, BarChart3 } from 'lucide-react';
+import { Facebook, Heart, Users, Play, TrendingUp, BarChart3, MessageCircle, Share2 } from 'lucide-react';
 
 interface TopVideo {
   id: string;
