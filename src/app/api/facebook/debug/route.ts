@@ -28,11 +28,40 @@ export async function GET() {
     const pageId = plPage.id;
     const pageAccessToken = plPage.access_token;
 
-    // Test insights endpoint
-    const insightsResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_impressions,page_engaged_users,page_post_engagements,page_video_views,page_views_total&period=days_28&access_token=${pageAccessToken}`
-    );
-    const insightsData = await insightsResponse.json();
+    // Test individual insights endpoints to see which work
+    const insightsTests: Record<string, any> = {};
+
+    // Test page_impressions with days_28
+    const imp28 = await fetch(
+      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_impressions&period=days_28&access_token=${pageAccessToken}`
+    ).then(r => r.json());
+    insightsTests['page_impressions_days_28'] = imp28;
+
+    // Test page_impressions with day
+    const impDay = await fetch(
+      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_impressions&period=day&access_token=${pageAccessToken}`
+    ).then(r => r.json());
+    insightsTests['page_impressions_day'] = impDay;
+
+    // Test page_post_engagements
+    const eng = await fetch(
+      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_post_engagements&period=days_28&access_token=${pageAccessToken}`
+    ).then(r => r.json());
+    insightsTests['page_post_engagements_days_28'] = eng;
+
+    // Test page_views_total
+    const views = await fetch(
+      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_views_total&period=day&access_token=${pageAccessToken}`
+    ).then(r => r.json());
+    insightsTests['page_views_total_day'] = views;
+
+    // Test page_engaged_users
+    const engaged = await fetch(
+      `https://graph.facebook.com/v24.0/${pageId}/insights?metric=page_engaged_users&period=day&access_token=${pageAccessToken}`
+    ).then(r => r.json());
+    insightsTests['page_engaged_users_day'] = engaged;
+
+    const insightsData = insightsTests;
 
     // Test posts endpoint with reactions
     const postsResponse = await fetch(
@@ -57,7 +86,7 @@ export async function GET() {
       pageName: plPage.name,
       hasPageAccessToken: !!pageAccessToken,
       tokenPermissions: tokenDebug.data?.scopes || [],
-      insightsResponse: insightsData,
+      insightsTests: insightsData,
       postsResponse: postsData,
       videosResponse: videosData,
     });
