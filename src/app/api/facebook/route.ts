@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 
+// Force dynamic rendering - no caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 
 interface VideoData {
