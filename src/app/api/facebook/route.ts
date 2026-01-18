@@ -77,9 +77,9 @@ export async function GET() {
       console.log('Page insights fetch error (non-fatal):', insightErr);
     }
 
-    // Get recent posts with engagement
+    // Get recent posts with engagement (using reactions instead of likes for v24.0)
     const postsResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,shares,likes.summary(true),comments.summary(true)&limit=25&access_token=${pageAccessToken}`
+      `https://graph.facebook.com/v24.0/${pageId}/posts?fields=id,message,created_time,shares,reactions.summary(total_count),comments.summary(total_count)&limit=25&access_token=${pageAccessToken}`
     );
     const postsData = await postsResponse.json();
 
@@ -90,11 +90,11 @@ export async function GET() {
 
     if (postsData.data) {
       postsData.data.forEach((post: any) => {
-        const likes = post.likes?.summary?.total_count || 0;
+        const reactions = post.reactions?.summary?.total_count || 0;
         const comments = post.comments?.summary?.total_count || 0;
         const shares = post.shares?.count || 0;
 
-        totalLikes += likes;
+        totalLikes += reactions;
         totalComments += comments;
         totalShares += shares;
 
@@ -102,7 +102,7 @@ export async function GET() {
           id: post.id,
           message: post.message?.substring(0, 100) || '',
           createdTime: post.created_time,
-          likes,
+          likes: reactions,
           comments,
           shares,
         });
