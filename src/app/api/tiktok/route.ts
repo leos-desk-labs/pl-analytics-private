@@ -144,7 +144,10 @@ export async function GET() {
 
     const userInfoData = await userInfoResponse.json();
 
-    if (userInfoData.error?.code) {
+    console.log('TikTok user info response:', JSON.stringify(userInfoData));
+
+    // Check for actual errors (not "ok" which means success)
+    if (userInfoData.error?.code && userInfoData.error.code !== 'ok') {
       console.error('TikTok user info error:', userInfoData.error);
 
       // If token is invalid, clear cache and retry once
