@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
 import SimpleChart from '@/components/SimpleChart';
-import { Facebook, Heart, Users, Play, TrendingUp, BarChart3, MessageCircle, Share2 } from 'lucide-react';
+import { Facebook, Heart, Users, Play, TrendingUp, BarChart3, MessageCircle, Share2, Clock } from 'lucide-react';
 
 interface TopVideo {
   id: string;
@@ -144,14 +144,21 @@ export default function FacebookPage() {
           </h1>
           <p className="text-gray-400 mt-1">{data?.pageName}</p>
         </div>
-        <div className="text-right">
-          <span className="px-3 py-1 rounded-full text-sm bg-brand-lime/20 text-brand-lime">
-            {data?.ytd?.year || new Date().getFullYear()} YTD
-          </span>
-          <p className="text-xs text-gray-500 mt-1">
-            {data?._meta?.videosAnalyzed} videos analyzed
-          </p>
-        </div>
+        {data?._meta?.generatedAt && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border border-gray-700 rounded-full text-sm">
+            <Clock size={14} className="text-brand-lime" />
+            <span className="text-gray-400">Updated</span>
+            <span className="text-white font-medium">
+              {new Date(data._meta.generatedAt).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              })}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* PRIMARY: 2026 YTD Performance Hero */}

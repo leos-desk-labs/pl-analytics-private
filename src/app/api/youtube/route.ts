@@ -91,6 +91,10 @@ export async function GET() {
 
   return NextResponse.json({
     ...stats,
-    recentVideos: videos
+    recentVideos: videos,
+    _meta: {
+      generatedAt: new Date().toISOString(),
+      source: 'YouTube Data API v3'
+    }
   });
 }

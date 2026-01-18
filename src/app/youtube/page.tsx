@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
 import SimpleChart from '@/components/SimpleChart';
-import { Youtube, Eye, ThumbsUp, MessageSquare, Play, Users, TrendingUp } from 'lucide-react';
+import { Youtube, Eye, ThumbsUp, MessageSquare, Play, Users, TrendingUp, Clock } from 'lucide-react';
 
 interface Video {
   id: string;
@@ -22,6 +22,10 @@ interface YouTubeData {
   viewCount: number;
   videoCount: number;
   recentVideos: Video[];
+  _meta?: {
+    generatedAt: string;
+    source: string;
+  };
 }
 
 export default function YouTubePage() {
@@ -93,9 +97,21 @@ export default function YouTubePage() {
           </h1>
           <p className="text-gray-400 mt-1">@PeoplesLeagueGolf | Live Data</p>
         </div>
-        <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
-          Connected
-        </span>
+        {data?._meta?.generatedAt && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border border-gray-700 rounded-full text-sm">
+            <Clock size={14} className="text-brand-lime" />
+            <span className="text-gray-400">Updated</span>
+            <span className="text-white font-medium">
+              {new Date(data._meta.generatedAt).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              })}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Primary Metric: Total Views */}

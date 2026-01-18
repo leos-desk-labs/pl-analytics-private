@@ -65,6 +65,10 @@ interface InstagramData {
     bestPerformers: ReelData[];
     needsImprovement: ReelData[];
   };
+  _meta?: {
+    generatedAt: string;
+    fromCache?: boolean;
+  };
   error?: string;
 }
 
@@ -136,9 +140,21 @@ export default function InstagramPage() {
           </h1>
           <p className="text-gray-400 mt-1">@{data.account.username}</p>
         </div>
-        <span className="px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400">
-          Live Data
-        </span>
+        {data._meta?.generatedAt && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border border-gray-700 rounded-full text-sm">
+            <Clock size={14} className="text-brand-lime" />
+            <span className="text-gray-400">Updated</span>
+            <span className="text-white font-medium">
+              {new Date(data._meta.generatedAt).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              })}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* PRIMARY METRIC: TOTAL VIEWS */}
