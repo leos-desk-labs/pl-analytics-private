@@ -71,6 +71,7 @@ export async function GET() {
     let videoNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,created_time,length,views,likes.summary(true),comments.summary(true)&limit=100&access_token=${pageAccessToken}`;
     let videoPageCount = 0;
 
+    let videoFetchError: string | null = null;
     while (videoNextUrl && videoPageCount < 20) {
       videoPageCount++;
       try {
@@ -78,6 +79,7 @@ export async function GET() {
         const videoData: any = await videoResponse.json();
 
         if (videoData.error) {
+          videoFetchError = videoData.error.message || 'Unknown video error';
           console.error('Video fetch error:', videoData.error);
           break;
         }
@@ -99,6 +101,7 @@ export async function GET() {
 
         videoNextUrl = videoData.paging?.next || null;
       } catch (err) {
+        videoFetchError = String(err);
         console.error('Video pagination error:', err);
         break;
       }
@@ -257,6 +260,8 @@ export async function GET() {
       _meta: {
         videosAnalyzed: allVideos.length,
         postsAnalyzed: allPosts.length,
+        videoPages: videoPageCount,
+        videoError: videoFetchError,
         dataType: 'lifetime',
         generatedAt: new Date().toISOString(),
       },
