@@ -65,27 +65,39 @@ export async function GET() {
     // 1. Fetch ALL videos with pagination (lifetime views per video)
     const allVideos: VideoData[] = [];
     let videoNextUrl: string | null = `https://graph.facebook.com/v24.0/${pageId}/videos?fields=id,title,description,created_time,length,views,likes.summary(true),comments.summary(true)&limit=100&access_token=${pageAccessToken}`;
+    let videoPageCount = 0;
 
-    while (videoNextUrl) {
-      const videoResponse: Response = await fetch(videoNextUrl);
-      const videoData: any = await videoResponse.json();
+    while (videoNextUrl && videoPageCount < 20) {
+      videoPageCount++;
+      try {
+        const videoResponse: Response = await fetch(videoNextUrl);
+        const videoData: any = await videoResponse.json();
 
-      if (videoData.data) {
-        videoData.data.forEach((video: any) => {
-          allVideos.push({
-            id: video.id,
-            title: video.title,
-            description: video.description,
-            created_time: video.created_time,
-            length: video.length,
-            views: video.views || 0,
-            likes: video.likes?.summary?.total_count || 0,
-            comments: video.comments?.summary?.total_count || 0,
-          });
-        });
+        if (videoData.error) {
+          console.error('Video fetch error:', videoData.error);
+          break;
+        }
+
+        if (videoData.data && Array.isArray(videoData.data)) {
+          for (const video of videoData.data) {
+            allVideos.push({
+              id: video.id,
+              title: video.title,
+              description: video.description,
+              created_time: video.created_time,
+              length: video.length,
+              views: video.views || 0,
+              likes: video.likes?.summary?.total_count || 0,
+              comments: video.comments?.summary?.total_count || 0,
+            });
+          }
+        }
+
+        videoNextUrl = videoData.paging?.next || null;
+      } catch (err) {
+        console.error('Video pagination error:', err);
+        break;
       }
-
-      videoNextUrl = videoData.paging?.next || null;
     }
 
     // 2. Fetch ALL posts with pagination (lifetime engagement per post)
