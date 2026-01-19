@@ -143,45 +143,18 @@ export default function XPage() {
           </div>
         </div>
         <div className="metric-card border-red-500 border">
-          <h3 className="text-lg font-semibold text-red-400 mb-2">Connection Error</h3>
+          <h3 className="text-lg font-semibold text-red-400 mb-2">Configuration Required</h3>
           <p className="text-gray-400 mb-4">{error}</p>
-          <div className="flex gap-3">
-            <button
-              onClick={fetchData}
-              className="px-4 py-2 bg-brand-lime text-black rounded-lg hover:bg-brand-lime/80 transition-colors"
-            >
-              Retry
-            </button>
-            <a
-              href="/api/x/auth"
-              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-            >
-              Connect X Account
-            </a>
-          </div>
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 bg-brand-lime text-black rounded-lg hover:bg-brand-lime/80 transition-colors"
+          >
+            Retry
+          </button>
         </div>
 
-        {/* Setup Instructions */}
-        <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Setup Instructions</h3>
-          <ol className="list-decimal list-inside space-y-2 text-gray-400">
-            <li>Go to the <a href="https://developer.twitter.com/en/portal/dashboard" target="_blank" rel="noopener noreferrer" className="text-brand-lime hover:underline">X Developer Portal</a></li>
-            <li>Create a new project and app (or use existing)</li>
-            <li>Enable OAuth 2.0 with read permissions</li>
-            <li>Add callback URL: <code className="bg-gray-800 px-2 py-1 rounded">https://pl-analytics-private.vercel.app/api/x/callback</code></li>
-            <li>Add these environment variables to Vercel:
-              <ul className="list-disc list-inside ml-4 mt-2">
-                <li><code className="bg-gray-800 px-1 rounded">X_CLIENT_ID</code> - OAuth 2.0 Client ID</li>
-                <li><code className="bg-gray-800 px-1 rounded">X_CLIENT_SECRET</code> - OAuth 2.0 Client Secret</li>
-              </ul>
-            </li>
-            <li>Click &quot;Connect X Account&quot; above to authorize</li>
-            <li>After authorization, add the refresh token to Vercel as <code className="bg-gray-800 px-1 rounded">X_REFRESH_TOKEN</code></li>
-          </ol>
-          <p className="mt-4 text-sm text-yellow-400">
-            Note: X API Basic tier ($100/mo) is required for full analytics including impressions.
-            Free tier provides limited access.
-          </p>
+        <div className="text-sm text-gray-500">
+          X API requires backend configuration. Contact administrator if you need access.
         </div>
       </div>
     );

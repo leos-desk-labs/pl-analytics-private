@@ -2,15 +2,13 @@ import { NextResponse } from 'next/server';
 import { getCached, setCache, getCacheInfo, getTimeUntilRefresh } from '@/lib/cache';
 
 // X (Twitter) API - Fetch account data and tweet stats for PL account
-// Automatically refreshes access token when expired
+// Uses Bearer Token (App-only auth) - no OAuth required
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const X_CLIENT_ID = process.env.X_CLIENT_ID;
-const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET;
-const X_REFRESH_TOKEN = process.env.X_REFRESH_TOKEN;
-const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
+const X_BEARER_TOKEN = process.env.X_BEARER_TOKEN;
+const X_USERNAME = process.env.X_USERNAME || 'PeoplesLeagueX';
 
 const CACHE_KEY = 'x_pl_data';
 
@@ -25,7 +23,6 @@ interface XUser {
     following_count: number;
     tweet_count: number;
     listed_count: number;
-    like_count: number;
   };
   verified: boolean;
   created_at: string;
@@ -43,81 +40,6 @@ interface XTweet {
     bookmark_count: number;
     impression_count: number;
   };
-  attachments?: {
-    media_keys?: string[];
-  };
-}
-
-interface TokenData {
-  access_token: string;
-  refresh_token: string;
-  expires_at: number;
-}
-
-// In-memory token storage
-let cachedToken: TokenData | null = null;
-
-async function getValidAccessToken(): Promise<string | null> {
-  // Check if we have a cached token that's still valid (with 5 min buffer)
-  if (cachedToken && cachedToken.expires_at > Date.now() + 5 * 60 * 1000) {
-    return cachedToken.access_token;
-  }
-
-  // If we have a static access token (for basic tier), use it
-  if (X_ACCESS_TOKEN && !X_REFRESH_TOKEN) {
-    return X_ACCESS_TOKEN;
-  }
-
-  // Need to refresh the token
-  if (!X_CLIENT_ID || !X_CLIENT_SECRET || !X_REFRESH_TOKEN) {
-    console.error('Missing X credentials for token refresh');
-    return null;
-  }
-
-  try {
-    console.log('Refreshing X access token...');
-
-    const refreshToken = cachedToken?.refresh_token || X_REFRESH_TOKEN;
-    const credentials = Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString('base64');
-
-    const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${credentials}`,
-      },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-      }),
-    });
-
-    const tokenData = await tokenResponse.json();
-
-    if (tokenData.error) {
-      console.error('X token refresh error:', tokenData);
-      return null;
-    }
-
-    // Cache the new tokens
-    cachedToken = {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || refreshToken,
-      expires_at: Date.now() + (tokenData.expires_in * 1000),
-    };
-
-    console.log('X token refreshed successfully, expires in', tokenData.expires_in, 'seconds');
-
-    // Log the new refresh token if it changed
-    if (tokenData.refresh_token && tokenData.refresh_token !== X_REFRESH_TOKEN) {
-      console.log('New refresh token issued - update X_REFRESH_TOKEN env var:', tokenData.refresh_token);
-    }
-
-    return cachedToken.access_token;
-  } catch (error) {
-    console.error('Failed to refresh X token:', error);
-    return null;
-  }
 }
 
 export async function GET() {
@@ -135,26 +57,21 @@ export async function GET() {
     });
   }
 
-  // Get a valid access token (auto-refreshes if needed)
-  const accessToken = await getValidAccessToken();
-
-  if (!accessToken) {
+  if (!X_BEARER_TOKEN) {
     return NextResponse.json({
-      error: 'X authentication failed',
-      setup_required: !X_REFRESH_TOKEN && !X_ACCESS_TOKEN,
-      message: X_REFRESH_TOKEN || X_ACCESS_TOKEN
-        ? 'Token refresh failed. The token may have expired. Re-authorize at /api/x/auth'
-        : 'Missing X credentials. Visit /api/x/auth to connect your X account, or add X_ACCESS_TOKEN for bearer token auth',
+      error: 'X_BEARER_TOKEN not configured',
+      message: 'Add X_BEARER_TOKEN environment variable from the X Developer Portal (Keys & Tokens > Bearer Token)',
+      setup_required: true,
     }, { status: 401 });
   }
 
   try {
-    // 1. Get authenticated user info
+    // 1. Get user info by username (app-only auth)
     const userResponse = await fetch(
-      'https://api.twitter.com/2/users/me?user.fields=id,name,username,profile_image_url,description,public_metrics,verified,created_at',
+      `https://api.twitter.com/2/users/by/username/${X_USERNAME}?user.fields=id,name,username,profile_image_url,description,public_metrics,verified,created_at`,
       {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${X_BEARER_TOKEN}`,
         },
       }
     );
@@ -163,37 +80,36 @@ export async function GET() {
 
     if (userData.errors) {
       console.error('X user info error:', userData.errors);
-
-      if (userData.errors[0]?.type === 'https://api.twitter.com/2/problems/not-authorized-for-resource') {
-        return NextResponse.json({
-          error: 'X API access denied',
-          message: 'Your X API access level may not include this endpoint. Check your developer portal access level.',
-        }, { status: 403 });
-      }
-
       return NextResponse.json({
         error: 'Failed to fetch X user info',
         details: userData.errors,
       }, { status: 500 });
     }
 
+    if (!userData.data) {
+      return NextResponse.json({
+        error: 'User not found',
+        username: X_USERNAME,
+      }, { status: 404 });
+    }
+
     const userInfo: XUser = userData.data;
 
     // 2. Get recent tweets with metrics
     const tweetsResponse = await fetch(
-      `https://api.twitter.com/2/users/${userInfo.id}/tweets?max_results=100&tweet.fields=id,text,created_at,public_metrics,attachments&expansions=attachments.media_keys&media.fields=type,url,preview_image_url`,
+      `https://api.twitter.com/2/users/${userInfo.id}/tweets?max_results=100&tweet.fields=id,text,created_at,public_metrics`,
       {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${X_BEARER_TOKEN}`,
         },
       }
     );
 
     const tweetsData = await tweetsResponse.json();
     const tweets: XTweet[] = tweetsData.data || [];
-    const media = tweetsData.includes?.media || [];
 
     // Calculate totals from recent tweets
+    // Note: impression_count requires user auth, so it may be 0 with app-only auth
     const totalImpressions = tweets.reduce((sum, t) => sum + (t.public_metrics?.impression_count || 0), 0);
     const totalLikes = tweets.reduce((sum, t) => sum + (t.public_metrics?.like_count || 0), 0);
     const totalRetweets = tweets.reduce((sum, t) => sum + (t.public_metrics?.retweet_count || 0), 0);
@@ -201,12 +117,11 @@ export async function GET() {
     const totalQuotes = tweets.reduce((sum, t) => sum + (t.public_metrics?.quote_count || 0), 0);
     const totalBookmarks = tweets.reduce((sum, t) => sum + (t.public_metrics?.bookmark_count || 0), 0);
 
-    // Sort tweets by impressions for top/bottom performers
-    const sortedByImpressions = [...tweets].sort(
-      (a, b) => (b.public_metrics?.impression_count || 0) - (a.public_metrics?.impression_count || 0)
+    // Sort tweets by likes (since impressions may not be available)
+    const sortedByLikes = [...tweets].sort(
+      (a, b) => (b.public_metrics?.like_count || 0) - (a.public_metrics?.like_count || 0)
     );
-    const topPerformers = sortedByImpressions.slice(0, 5);
-    const bottomPerformers = sortedByImpressions.slice(-5).reverse();
+    const topPerformers = sortedByLikes.slice(0, 5);
 
     const responseData = {
       // Account Overview
@@ -234,11 +149,8 @@ export async function GET() {
         totalQuotes,
         totalBookmarks,
         totalEngagement: totalLikes + totalRetweets + totalReplies + totalQuotes,
-        avgImpressionsPerTweet: tweets.length > 0 ? Math.round(totalImpressions / tweets.length) : 0,
+        avgLikesPerTweet: tweets.length > 0 ? Math.round(totalLikes / tweets.length) : 0,
         avgEngagementPerTweet: tweets.length > 0 ? Math.round((totalLikes + totalRetweets + totalReplies) / tweets.length) : 0,
-        engagementRate: totalImpressions > 0
-          ? ((totalLikes + totalRetweets + totalReplies) / totalImpressions * 100).toFixed(2) + '%'
-          : '0%',
       },
 
       // Tweet Performance
@@ -252,15 +164,8 @@ export async function GET() {
           retweets: t.public_metrics?.retweet_count || 0,
           replies: t.public_metrics?.reply_count || 0,
           quotes: t.public_metrics?.quote_count || 0,
-          url: `https://twitter.com/${userInfo.username}/status/${t.id}`,
+          url: `https://x.com/${userInfo.username}/status/${t.id}`,
           createdAt: t.created_at,
-        })),
-        needsImprovement: bottomPerformers.map(t => ({
-          id: t.id,
-          text: t.text?.substring(0, 100) + (t.text?.length > 100 ? '...' : ''),
-          impressions: t.public_metrics?.impression_count || 0,
-          likes: t.public_metrics?.like_count || 0,
-          url: `https://twitter.com/${userInfo.username}/status/${t.id}`,
         })),
       },
 
@@ -268,8 +173,9 @@ export async function GET() {
       _meta: {
         generatedAt: new Date().toISOString(),
         apiVersion: 'v2',
+        authType: 'app-only',
         tweetsAnalyzed: tweets.length,
-        note: 'Stats are based on the most recent 100 tweets. Impression data requires Basic API access or higher.',
+        note: 'Using app-only auth. Impressions require user auth (OAuth 2.0 with user context).',
         fromCache: false,
         cacheInfo: getCacheInfo(),
         nextRefresh: getTimeUntilRefresh(),
