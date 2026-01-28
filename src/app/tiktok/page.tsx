@@ -2,62 +2,35 @@
 
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
-import { Music2, Users, Eye, Heart, Share2, Video, RefreshCw } from 'lucide-react';
+import { Music2, Users, Heart, Video, RefreshCw, UserPlus } from 'lucide-react';
 
 interface TikTokData {
   account: {
     displayName: string;
+    username: string;
     avatarUrl: string;
+    bio: string;
+    verified: boolean;
     followers: number;
     following: number;
     totalLikes: number;
     videoCount: number;
   };
-  totalViews: {
-    videos: number;
-    allContent: number;
-  };
   allTimeStats: {
     totalVideos: number;
-    totalViews: number;
     totalLikes: number;
-    totalComments: number;
-    totalShares: number;
-    avgViewsPerVideo: number;
-    avgLikesPerVideo: number;
-  };
-  videoPerformance: {
-    totalVideos: number;
-    bestPerformers: Array<{
-      id: string;
-      title: string;
-      views: number;
-      likes: number;
-      comments: number;
-      shares: number;
-      coverImage: string;
-      shareUrl: string;
-      createdAt: string;
-    }>;
-    needsImprovement: Array<{
-      id: string;
-      title: string;
-      views: number;
-      likes: number;
-      coverImage: string;
-      shareUrl: string;
-    }>;
+    followers: number;
+    following: number;
   };
   _meta: {
     generatedAt: string;
+    source: string;
+    note: string;
     fromCache: boolean;
     nextRefresh: string;
-    videosAnalyzed: number;
-    note: string;
   };
   error?: string;
   message?: string;
-  setup_required?: boolean;
 }
 
 function formatNumber(num: number): string {
@@ -131,7 +104,7 @@ export default function TikTokPage() {
           </div>
         </div>
         <div className="metric-card border-red-500 border">
-          <h3 className="text-lg font-semibold text-red-400 mb-2">Connection Error</h3>
+          <h3 className="text-lg font-semibold text-red-400 mb-2">Error Loading Data</h3>
           <p className="text-gray-400">{error}</p>
           <button
             onClick={fetchData}
@@ -162,7 +135,10 @@ export default function TikTokPage() {
               TikTok Analytics
             </h1>
             <p className="text-gray-400 mt-1">
-              @{data?.account?.displayName || 'peoplesleaguegolf'}
+              @{data?.account?.username || 'peoplesleaguegolf'}
+              {data?.account?.bio && (
+                <span className="ml-2 text-gray-500">— {data.account.bio}</span>
+              )}
             </p>
           </div>
         </div>
@@ -195,13 +171,6 @@ export default function TikTokPage() {
           icon={<Users size={20} />}
         />
         <MetricCard
-          label="Total Video Views"
-          value={formatNumber(data?.allTimeStats?.totalViews || 0)}
-          change={`${data?.allTimeStats?.totalVideos || 0} videos analyzed`}
-          changeType="neutral"
-          icon={<Eye size={20} />}
-        />
-        <MetricCard
           label="Total Likes"
           value={formatNumber(data?.account?.totalLikes || 0)}
           change="All-time likes"
@@ -215,91 +184,61 @@ export default function TikTokPage() {
           changeType="neutral"
           icon={<Video size={20} />}
         />
+        <MetricCard
+          label="Following"
+          value={formatNumber(data?.account?.following || 0)}
+          change="Accounts followed"
+          changeType="neutral"
+          icon={<UserPlus size={20} />}
+        />
       </div>
 
-      {/* Engagement Stats */}
+      {/* Engagement Summary */}
       <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4">Engagement Summary</h3>
+        <h3 className="text-lg font-semibold mb-4">Profile Summary</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div>
-            <p className="text-gray-400 text-sm">Avg Views/Video</p>
-            <p className="text-2xl font-bold text-white">
-              {formatNumber(data?.allTimeStats?.avgViewsPerVideo || 0)}
-            </p>
-          </div>
           <div>
             <p className="text-gray-400 text-sm">Avg Likes/Video</p>
             <p className="text-2xl font-bold text-white">
-              {formatNumber(data?.allTimeStats?.avgLikesPerVideo || 0)}
+              {data?.account?.videoCount
+                ? formatNumber(Math.round((data.account.totalLikes || 0) / data.account.videoCount))
+                : '0'}
             </p>
           </div>
           <div>
-            <p className="text-gray-400 text-sm">Total Comments</p>
+            <p className="text-gray-400 text-sm">Follower:Following</p>
             <p className="text-2xl font-bold text-white">
-              {formatNumber(data?.allTimeStats?.totalComments || 0)}
+              {data?.account?.following
+                ? ((data.account.followers || 0) / data.account.following).toFixed(1)
+                : '0'}
+              :1
             </p>
           </div>
           <div>
-            <p className="text-gray-400 text-sm">Total Shares</p>
+            <p className="text-gray-400 text-sm">Likes/Follower</p>
             <p className="text-2xl font-bold text-white">
-              {formatNumber(data?.allTimeStats?.totalShares || 0)}
+              {data?.account?.followers
+                ? ((data.account.totalLikes || 0) / data.account.followers).toFixed(1)
+                : '0'}
+            </p>
+          </div>
+          <div>
+            <p className="text-gray-400 text-sm">Data Source</p>
+            <p className="text-2xl font-bold text-white capitalize">
+              {data?._meta?.source === 'public_profile' ? 'Public' : 'API'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Top Performers */}
-      {data?.videoPerformance?.bestPerformers && data.videoPerformance.bestPerformers.length > 0 && (
-        <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">Top Performing Videos</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.videoPerformance.bestPerformers.slice(0, 6).map((video) => (
-              <a
-                key={video.id}
-                href={video.shareUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex gap-3 p-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                {video.coverImage && (
-                  <img
-                    src={video.coverImage}
-                    alt={video.title}
-                    className="w-20 h-28 object-cover rounded"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">
-                    {video.title || 'Untitled'}
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    <p className="text-gray-400 text-xs flex items-center gap-1">
-                      <Eye size={12} /> {formatNumber(video.views)} views
-                    </p>
-                    <p className="text-gray-400 text-xs flex items-center gap-1">
-                      <Heart size={12} /> {formatNumber(video.likes)} likes
-                    </p>
-                    <p className="text-gray-400 text-xs flex items-center gap-1">
-                      <Share2 size={12} /> {formatNumber(video.shares)} shares
-                    </p>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Note about Sandbox */}
-      {data?.allTimeStats?.totalViews === 0 && (
-        <div className="metric-card border-yellow-500/50 border">
-          <h3 className="text-lg font-semibold text-yellow-400 mb-2">Sandbox Mode</h3>
-          <p className="text-gray-400">
-            Video view counts require Production API access. Account-level stats (followers, likes, video count)
-            are available in Sandbox mode. Submit for Production review to unlock full video analytics.
-          </p>
-        </div>
-      )}
+      {/* Note about limited data */}
+      <div className="metric-card border-yellow-500/30 border">
+        <h3 className="text-lg font-semibold text-yellow-400 mb-2">Limited Analytics</h3>
+        <p className="text-gray-400">
+          Per-video analytics (views, shares, comments) are unavailable. TikTok&apos;s Developer API does not approve apps for internal analytics use.
+          Profile-level stats (followers, total likes, video count) are sourced from the public profile.
+        </p>
+      </div>
 
       {/* Meta Info */}
       <div className="text-xs text-gray-500 text-right">
