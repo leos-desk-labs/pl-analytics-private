@@ -8,6 +8,7 @@ const navItems = [
   { href: '/', label: 'Overview', icon: '◆', color: '#e7ff01' },
   { href: '/creators', label: 'Creator Hub', icon: '★', color: '#f472b6' },
   { href: '/sponsors', label: 'Sponsor Hub', icon: '$', color: '#22c55e' },
+  { href: '/liquidiv', label: 'Liquid IV', icon: '💧', color: '#54C3CF' },
   { href: '/youtube', label: 'YouTube', icon: '▶', color: '#FF0000' },
   { href: '/instagram', label: 'Instagram', icon: '◆', color: '#E4405F' },
   { href: '/tiktok', label: 'TikTok', icon: '♪', color: '#00f2ea' },
