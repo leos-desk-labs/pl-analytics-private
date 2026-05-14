@@ -49,36 +49,32 @@ export default function OverviewPage() {
   const currentYear = new Date().getFullYear();
   const config = VIEW_CONFIG[viewMode];
 
-  const fetchWithTimeout = useCallback((url: string, timeoutMs = 12000) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    return fetch(url, { signal: controller.signal })
-      .then(res => res.json())
-      .catch(() => null)
-      .finally(() => clearTimeout(timeout));
-  }, []);
-
   const fetchData = useCallback(async (mode: ViewMode) => {
     setLoading(true);
+    setYoutubeData(null);
+    setInstagramData(null);
+    setFacebookData(null);
+    setTiktokPostsData(null);
+
     const cfg = VIEW_CONFIG[mode];
     const params = new URLSearchParams();
     if (cfg.from) params.set('from', cfg.from);
     if (cfg.to) params.set('to', cfg.to);
     const qs = params.toString() ? `?${params.toString()}` : '';
 
-    const [youtube, instagram, facebook, tiktokPosts] = await Promise.all([
-      fetchWithTimeout(`/api/youtube${qs}`),
-      fetchWithTimeout(`/api/instagram${qs}`),
-      fetchWithTimeout(`/api/facebook${qs}`),
-      fetchWithTimeout(`/api/tiktok-posts${qs}`),
-    ]);
+    // Fire all fetches independently — each updates state as it arrives
+    // This way fast APIs (YouTube, TikTok) render immediately while slow ones (IG, FB) load in the background
+    let resolved = 0;
+    const checkDone = () => { resolved++; if (resolved >= 4) setLoading(false); };
 
-    setYoutubeData(youtube);
-    setInstagramData(instagram?.error ? null : instagram);
-    setFacebookData(facebook?.error ? null : facebook);
-    setTiktokPostsData(tiktokPosts?.error ? null : tiktokPosts);
-    setLoading(false);
-  }, [fetchWithTimeout]);
+    fetch(`/api/youtube${qs}`).then(r => r.json()).then(d => setYoutubeData(d)).catch(() => {}).finally(checkDone);
+    fetch(`/api/instagram${qs}`).then(r => r.json()).then(d => setInstagramData(d?.error ? null : d)).catch(() => {}).finally(checkDone);
+    fetch(`/api/facebook${qs}`).then(r => r.json()).then(d => setFacebookData(d?.error ? null : d)).catch(() => {}).finally(checkDone);
+    fetch(`/api/tiktok-posts${qs}`).then(r => r.json()).then(d => setTiktokPostsData(d?.error ? null : d)).catch(() => {}).finally(checkDone);
+
+    // Remove initial loading state once the first API responds (show partial data fast)
+    setTimeout(() => setLoading(false), 5000);
+  }, []);
 
   useEffect(() => {
     fetchData(viewMode);
