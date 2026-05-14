@@ -49,6 +49,15 @@ export default function OverviewPage() {
   const currentYear = new Date().getFullYear();
   const config = VIEW_CONFIG[viewMode];
 
+  const fetchWithTimeout = useCallback((url: string, timeoutMs = 12000) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, { signal: controller.signal })
+      .then(res => res.json())
+      .catch(() => null)
+      .finally(() => clearTimeout(timeout));
+  }, []);
+
   const fetchData = useCallback(async (mode: ViewMode) => {
     setLoading(true);
     const cfg = VIEW_CONFIG[mode];
@@ -58,10 +67,10 @@ export default function OverviewPage() {
     const qs = params.toString() ? `?${params.toString()}` : '';
 
     const [youtube, instagram, facebook, tiktokPosts] = await Promise.all([
-      fetch(`/api/youtube${qs}`).then(res => res.json()).catch(() => null),
-      fetch(`/api/instagram${qs}`).then(res => res.json()).catch(() => null),
-      fetch(`/api/facebook${qs}`).then(res => res.json()).catch(() => null),
-      fetch(`/api/tiktok-posts${qs}`).then(res => res.json()).catch(() => null),
+      fetchWithTimeout(`/api/youtube${qs}`),
+      fetchWithTimeout(`/api/instagram${qs}`),
+      fetchWithTimeout(`/api/facebook${qs}`),
+      fetchWithTimeout(`/api/tiktok-posts${qs}`),
     ]);
 
     setYoutubeData(youtube);
@@ -69,7 +78,7 @@ export default function OverviewPage() {
     setFacebookData(facebook?.error ? null : facebook);
     setTiktokPostsData(tiktokPosts?.error ? null : tiktokPosts);
     setLoading(false);
-  }, []);
+  }, [fetchWithTimeout]);
 
   useEffect(() => {
     fetchData(viewMode);
