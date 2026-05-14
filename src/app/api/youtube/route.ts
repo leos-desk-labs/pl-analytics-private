@@ -7,10 +7,8 @@ const YTD_START = `${CURRENT_YEAR}-01-01T00:00:00Z`;
 
 async function getChannelId(handle: string): Promise<string | null> {
   if (!YOUTUBE_API_KEY) return null;
-
   const cleanHandle = handle.replace('@', '');
   const url = `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${cleanHandle}&key=${YOUTUBE_API_KEY}`;
-
   try {
     const res = await fetch(url, { next: { revalidate: 3600 } });
     const data = await res.json();
@@ -22,16 +20,12 @@ async function getChannelId(handle: string): Promise<string | null> {
 
 async function getChannelStats(channelId: string) {
   if (!YOUTUBE_API_KEY) return null;
-
   const url = `https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`;
-
   try {
     const res = await fetch(url, { next: { revalidate: 3600 } });
     const data = await res.json();
     const channel = data.items?.[0];
-
     if (!channel) return null;
-
     return {
       channelId,
       title: channel.snippet?.title,
@@ -65,7 +59,6 @@ async function getRecentVideos(channelId: string) {
   try {
     const searchRes = await fetch(searchUrl, { next: { revalidate: 3600 } });
     const searchData = await searchRes.json();
-
     const videoIds = searchData.items?.map((item: any) => item.id?.videoId).filter(Boolean).join(',');
     if (!videoIds) return [];
 
@@ -77,7 +70,6 @@ async function getRecentVideos(channelId: string) {
     return videosData.items?.map((video: any) => {
       const durationSeconds = parseDuration(video.contentDetails?.duration || 'PT0S');
       const isShort = durationSeconds <= 60;
-
       return {
         id: video.id,
         title: video.snippet?.title,
@@ -97,10 +89,15 @@ async function getRecentVideos(channelId: string) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!YOUTUBE_API_KEY) {
     return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
   }
+
+  // Parse optional date filter params
+  const { searchParams } = new URL(request.url);
+  const fromParam = searchParams.get('from');
+  const toParam = searchParams.get('to');
 
   const channelId = await getChannelId(CHANNEL_HANDLE);
   if (!channelId) {
@@ -116,26 +113,40 @@ export async function GET() {
   const longFormVideos = videos.filter((v: any) => !v.isShort);
   const shortsVideos = videos.filter((v: any) => v.isShort);
 
-  // Filter for YTD (2026) videos
-  const ytdLongForm = longFormVideos.filter((v: any) => v.publishedAt >= YTD_START);
-  const ytdShorts = shortsVideos.filter((v: any) => v.publishedAt >= YTD_START);
+  // Determine date range for filtering
+  const filterFrom = fromParam ? `${fromParam}T00:00:00Z` : YTD_START;
+  const filterTo = toParam ? `${toParam}T23:59:59Z` : null;
 
-  // Calculate YTD stats
-  const ytdLongFormStats = {
-    videoCount: ytdLongForm.length,
-    views: ytdLongForm.reduce((sum: number, v: any) => sum + v.viewCount, 0),
-    likes: ytdLongForm.reduce((sum: number, v: any) => sum + v.likeCount, 0),
-    comments: ytdLongForm.reduce((sum: number, v: any) => sum + v.commentCount, 0),
+  // Filter videos by date range
+  const filteredLongForm = longFormVideos.filter((v: any) => {
+    if (!v.publishedAt) return false;
+    if (v.publishedAt < filterFrom) return false;
+    if (filterTo && v.publishedAt > filterTo) return false;
+    return true;
+  });
+  const filteredShorts = shortsVideos.filter((v: any) => {
+    if (!v.publishedAt) return false;
+    if (v.publishedAt < filterFrom) return false;
+    if (filterTo && v.publishedAt > filterTo) return false;
+    return true;
+  });
+
+  // Calculate filtered stats
+  const filteredLongFormStats = {
+    videoCount: filteredLongForm.length,
+    views: filteredLongForm.reduce((sum: number, v: any) => sum + v.viewCount, 0),
+    likes: filteredLongForm.reduce((sum: number, v: any) => sum + v.likeCount, 0),
+    comments: filteredLongForm.reduce((sum: number, v: any) => sum + v.commentCount, 0),
   };
 
-  const ytdShortsStats = {
-    videoCount: ytdShorts.length,
-    views: ytdShorts.reduce((sum: number, v: any) => sum + v.viewCount, 0),
-    likes: ytdShorts.reduce((sum: number, v: any) => sum + v.likeCount, 0),
-    comments: ytdShorts.reduce((sum: number, v: any) => sum + v.commentCount, 0),
+  const filteredShortsStats = {
+    videoCount: filteredShorts.length,
+    views: filteredShorts.reduce((sum: number, v: any) => sum + v.viewCount, 0),
+    likes: filteredShorts.reduce((sum: number, v: any) => sum + v.likeCount, 0),
+    comments: filteredShorts.reduce((sum: number, v: any) => sum + v.commentCount, 0),
   };
 
-  // Calculate lifetime stats from all fetched videos (note: this is limited to 50 most recent)
+  // Calculate lifetime stats from all fetched videos
   const lifetimeLongFormStats = {
     videoCount: longFormVideos.length,
     views: longFormVideos.reduce((sum: number, v: any) => sum + v.viewCount, 0),
@@ -160,10 +171,11 @@ export async function GET() {
     ...stats,
     ytd: {
       year: CURRENT_YEAR,
-      longForm: ytdLongFormStats,
-      shorts: ytdShortsStats,
-      totalViews: ytdLongFormStats.views + ytdShortsStats.views,
-      totalVideos: ytdLongFormStats.videoCount + ytdShortsStats.videoCount,
+      longForm: filteredLongFormStats,
+      shorts: filteredShortsStats,
+      totalViews: filteredLongFormStats.views + filteredShortsStats.views,
+      totalVideos: filteredLongFormStats.videoCount + filteredShortsStats.videoCount,
+      filters: { from: fromParam, to: toParam },
     },
     lifetime: {
       longForm: lifetimeLongFormStats,
