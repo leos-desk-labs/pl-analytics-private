@@ -20,8 +20,9 @@ interface MediaItem {
   permalink: string;
 }
 
-interface ReelInsights {
-  views: number;
+interface MediaInsights {
+  // Reels use "views", Images/Carousels use "impressions" — we normalize to "impressions"
+  impressions: number;
   reach: number;
   shares: number;
   saved: number;
@@ -30,21 +31,91 @@ interface ReelInsights {
 }
 
 interface MediaWithInsights extends MediaItem {
-  insights: ReelInsights;
+  insights: MediaInsights;
   engagementRate: number;
 }
 
-export async function GET() {
+/**
+ * Fetch insights for a single media item.
+ * Reels: views, reach, shares, saved, watch time
+ * Images/Carousels: impressions, reach, saved
+ */
+async function fetchMediaInsights(media: MediaItem): Promise<MediaWithInsights> {
+  try {
+    const isReel = media.media_type === 'VIDEO';
+    const metrics = isReel
+      ? 'views,reach,shares,saved,ig_reels_video_view_total_time,ig_reels_avg_watch_time'
+      : 'impressions,reach,saved';
+
+    const insightsResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${media.id}/insights?metric=${metrics}&access_token=${META_ACCESS_TOKEN}`
+    );
+    const insights = await insightsResponse.json();
+
+    if (insights.error) {
+      // Some older content may not support insights — fall back gracefully
+      return {
+        ...media,
+        insights: { impressions: 0, reach: 0, shares: 0, saved: 0, totalWatchTimeMs: 0, avgWatchTimeMs: 0 },
+        engagementRate: 0,
+      };
+    }
+
+    const getMetricValue = (name: string) =>
+      insights.data?.find((i: { name: string }) => i.name === name)?.values?.[0]?.value || 0;
+
+    const impressions = isReel ? getMetricValue('views') : getMetricValue('impressions');
+    const reach = getMetricValue('reach');
+    const shares = isReel ? getMetricValue('shares') : 0;
+    const saved = getMetricValue('saved');
+    const totalWatchTimeMs = isReel ? getMetricValue('ig_reels_video_view_total_time') : 0;
+    const avgWatchTimeMs = isReel ? getMetricValue('ig_reels_avg_watch_time') : 0;
+
+    const mediaInsights: MediaInsights = {
+      impressions,
+      reach,
+      shares,
+      saved,
+      totalWatchTimeMs,
+      avgWatchTimeMs,
+    };
+
+    return {
+      ...media,
+      insights: mediaInsights,
+      engagementRate: reach > 0
+        ? ((media.like_count + media.comments_count + shares + saved) / reach * 100)
+        : 0,
+    };
+  } catch {
+    return {
+      ...media,
+      insights: { impressions: 0, reach: 0, shares: 0, saved: 0, totalWatchTimeMs: 0, avgWatchTimeMs: 0 },
+      engagementRate: 0,
+    };
+  }
+}
+
+export async function GET(request: Request) {
   if (!META_ACCESS_TOKEN) {
     return NextResponse.json({ error: 'META_ACCESS_TOKEN not configured' }, { status: 500 });
   }
-
   if (!META_INSTAGRAM_ID) {
     return NextResponse.json({ error: 'META_INSTAGRAM_ID not configured' }, { status: 500 });
   }
 
+  // Parse date filters from query params
+  const { searchParams } = new URL(request.url);
+  const fromDate = searchParams.get('from');
+  const toDate = searchParams.get('to');
+
+  // Build cache key with date params for filtered requests
+  const cacheKey = fromDate || toDate
+    ? `${CACHE_KEY}_${fromDate || 'all'}_${toDate || 'all'}`
+    : CACHE_KEY;
+
   // Check for cached data (refreshes daily at 5am ET)
-  const cachedData = getCached<Record<string, unknown>>(CACHE_KEY);
+  const cachedData = getCached<Record<string, unknown>>(cacheKey);
   if (cachedData) {
     return NextResponse.json({
       ...cachedData,
@@ -65,25 +136,21 @@ export async function GET() {
     const igInfo = await igInfoResponse.json();
 
     if (igInfo.error) {
-      // Check if it's a token expiration error
       const errorMessage = igInfo.error.message || 'Unknown error';
       const isExpired = errorMessage.toLowerCase().includes('expired') ||
-                        errorMessage.toLowerCase().includes('session') ||
-                        igInfo.error.code === 190;
+        errorMessage.toLowerCase().includes('session') ||
+        igInfo.error.code === 190;
 
       if (isExpired) {
-        // Parse expiration time from error message if available
         const expirationMatch = errorMessage.match(/expired on ([^.]+)/i);
         const expirationTime = expirationMatch ? expirationMatch[1] : 'unknown time';
         const now = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
-
         return NextResponse.json({
           error: `Error validating access token: Session has expired on ${expirationTime}. The current time is ${now}.`,
           tokenExpired: true,
           needsReauthorization: true
         }, { status: 401 });
       }
-
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
@@ -99,7 +166,8 @@ export async function GET() {
 
     // 3. Get ALL media with pagination (basic fields only - fast)
     const allMedia: MediaItem[] = [];
-    let nextUrl: string | null = `https://graph.facebook.com/v18.0/${META_INSTAGRAM_ID}/media?fields=id,media_type,like_count,comments_count,caption,timestamp,permalink&limit=100&access_token=${META_ACCESS_TOKEN}`;
+    let nextUrl: string | null =
+      `https://graph.facebook.com/v18.0/${META_INSTAGRAM_ID}/media?fields=id,media_type,like_count,comments_count,caption,timestamp,permalink&limit=100&access_token=${META_ACCESS_TOKEN}`;
 
     while (nextUrl !== null && allMedia.length < 500) {
       const mediaResponse: Response = await fetch(nextUrl);
@@ -115,91 +183,108 @@ export async function GET() {
     const images = allMedia.filter(m => m.media_type === 'IMAGE');
     const carousels = allMedia.filter(m => m.media_type === 'CAROUSEL_ALBUM');
 
-    // 5. Calculate totals from basic fields
+    // 5. Calculate totals from basic fields (all content)
     const totalLikes = allMedia.reduce((sum, m) => sum + (m.like_count || 0), 0);
     const totalComments = allMedia.reduce((sum, m) => sum + (m.comments_count || 0), 0);
 
-    // 6. Fetch insights for ALL reels (views, reach, shares, saves, watch time)
+    // 6. Determine which content to fetch detailed insights for
+    // Use date filter if provided, otherwise use YTD
+    const now = new Date();
+    const filterStart = fromDate ? new Date(fromDate) : new Date(now.getFullYear(), 0, 1);
+    const filterEnd = toDate ? new Date(toDate) : now;
+
+    // Filter media by date range for detailed insights
+    const filteredMedia = allMedia.filter(m => {
+      const ts = new Date(m.timestamp);
+      return ts >= filterStart && ts <= filterEnd;
+    });
+
+    const filteredReels = filteredMedia.filter(m => m.media_type === 'VIDEO');
+    const filteredImages = filteredMedia.filter(m => m.media_type === 'IMAGE');
+    const filteredCarousels = filteredMedia.filter(m => m.media_type === 'CAROUSEL_ALBUM');
+
+    // 7. Fetch insights for ALL filtered content (reels + images + carousels)
     // Process in batches of 10 to avoid rate limits
     const batchSize = 10;
-    const allReelInsights: MediaWithInsights[] = [];
+    const allFilteredInsights: MediaWithInsights[] = [];
 
-    for (let i = 0; i < reels.length; i += batchSize) {
-      const batch = reels.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map(async (media): Promise<MediaWithInsights> => {
-          try {
-            const insightsResponse = await fetch(
-              `https://graph.facebook.com/v18.0/${media.id}/insights?metric=views,reach,shares,saved,ig_reels_video_view_total_time,ig_reels_avg_watch_time&access_token=${META_ACCESS_TOKEN}`
-            );
-            const insights = await insightsResponse.json();
-
-            const getMetricValue = (name: string) =>
-              insights.data?.find((i: { name: string }) => i.name === name)?.values?.[0]?.value || 0;
-
-            const reelInsights: ReelInsights = {
-              views: getMetricValue('views'),
-              reach: getMetricValue('reach'),
-              shares: getMetricValue('shares'),
-              saved: getMetricValue('saved'),
-              totalWatchTimeMs: getMetricValue('ig_reels_video_view_total_time'),
-              avgWatchTimeMs: getMetricValue('ig_reels_avg_watch_time'),
-            };
-
-            return {
-              ...media,
-              insights: reelInsights,
-              engagementRate: reelInsights.reach > 0
-                ? ((media.like_count + media.comments_count + reelInsights.shares + reelInsights.saved) / reelInsights.reach * 100)
-                : 0,
-            };
-          } catch {
-            return {
-              ...media,
-              insights: { views: 0, reach: 0, shares: 0, saved: 0, totalWatchTimeMs: 0, avgWatchTimeMs: 0 },
-              engagementRate: 0,
-            };
-          }
-        })
-      );
-      allReelInsights.push(...batchResults);
+    for (let i = 0; i < filteredMedia.length; i += batchSize) {
+      const batch = filteredMedia.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(fetchMediaInsights));
+      allFilteredInsights.push(...batchResults);
     }
 
-    // 7. Calculate aggregate stats from ALL reels
-    const totalReelViews = allReelInsights.reduce((sum, r) => sum + r.insights.views, 0);
-    const totalReelReach = allReelInsights.reduce((sum, r) => sum + r.insights.reach, 0);
-    const totalShares = allReelInsights.reduce((sum, r) => sum + r.insights.shares, 0);
-    const totalSaves = allReelInsights.reduce((sum, r) => sum + r.insights.saved, 0);
-    const totalWatchTimeMs = allReelInsights.reduce((sum, r) => sum + r.insights.totalWatchTimeMs, 0);
-    const avgWatchTimeMs = allReelInsights.length > 0
+    // Separate insights by type for breakdown stats
+    const reelInsights = allFilteredInsights.filter(m => m.media_type === 'VIDEO');
+    const imageInsights = allFilteredInsights.filter(m => m.media_type === 'IMAGE');
+    const carouselInsights = allFilteredInsights.filter(m => m.media_type === 'CAROUSEL_ALBUM');
+
+    // 8. Calculate aggregate stats — ALL CONTENT
+    const totalFilteredImpressions = allFilteredInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
+    const totalFilteredReach = allFilteredInsights.reduce((sum, r) => sum + r.insights.reach, 0);
+    const totalFilteredShares = allFilteredInsights.reduce((sum, r) => sum + r.insights.shares, 0);
+    const totalFilteredSaves = allFilteredInsights.reduce((sum, r) => sum + r.insights.saved, 0);
+    const totalFilteredLikes = allFilteredInsights.reduce((sum, r) => sum + (r.like_count || 0), 0);
+    const totalFilteredComments = allFilteredInsights.reduce((sum, r) => sum + (r.comments_count || 0), 0);
+
+    // Reel-specific stats
+    const reelImpressions = reelInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
+    const reelReach = reelInsights.reduce((sum, r) => sum + r.insights.reach, 0);
+    const reelShares = reelInsights.reduce((sum, r) => sum + r.insights.shares, 0);
+    const reelSaves = reelInsights.reduce((sum, r) => sum + r.insights.saved, 0);
+    const totalWatchTimeMs = reelInsights.reduce((sum, r) => sum + r.insights.totalWatchTimeMs, 0);
+    const avgWatchTimeMs = reelInsights.length > 0
+      ? reelInsights.reduce((sum, r) => sum + r.insights.avgWatchTimeMs, 0) / reelInsights.length
+      : 0;
+
+    // Image-specific stats
+    const imageImpressions = imageInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
+    const imageReach = imageInsights.reduce((sum, r) => sum + r.insights.reach, 0);
+    const imageSaves = imageInsights.reduce((sum, r) => sum + r.insights.saved, 0);
+
+    // Carousel-specific stats
+    const carouselImpressions = carouselInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
+    const carouselReach = carouselInsights.reduce((sum, r) => sum + r.insights.reach, 0);
+    const carouselSaves = carouselInsights.reduce((sum, r) => sum + r.insights.saved, 0);
+
+    // 9. Also fetch insights for ALL reels (lifetime) for lifetime totals
+    // Only fetch reels not already in the filtered set
+    const filteredReelIds = new Set(reelInsights.map(r => r.id));
+    const remainingReels = reels.filter(r => !filteredReelIds.has(r.id));
+
+    const remainingReelInsights: MediaWithInsights[] = [];
+    for (let i = 0; i < remainingReels.length; i += batchSize) {
+      const batch = remainingReels.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(fetchMediaInsights));
+      remainingReelInsights.push(...batchResults);
+    }
+
+    const allReelInsights = [...reelInsights, ...remainingReelInsights];
+    const lifetimeReelViews = allReelInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
+    const lifetimeReelReach = allReelInsights.reduce((sum, r) => sum + r.insights.reach, 0);
+    const lifetimeReelShares = allReelInsights.reduce((sum, r) => sum + r.insights.shares, 0);
+    const lifetimeReelSaves = allReelInsights.reduce((sum, r) => sum + r.insights.saved, 0);
+    const lifetimeWatchTimeMs = allReelInsights.reduce((sum, r) => sum + r.insights.totalWatchTimeMs, 0);
+    const lifetimeAvgWatchTimeMs = allReelInsights.length > 0
       ? allReelInsights.reduce((sum, r) => sum + r.insights.avgWatchTimeMs, 0) / allReelInsights.length
       : 0;
 
-    // 7.5 Calculate YTD stats (Year-to-Date)
-    const now = new Date();
-    const ytdStart = new Date(now.getFullYear(), 0, 1); // Jan 1st
-    const ytdReels = allReelInsights.filter(r => new Date(r.timestamp) >= ytdStart);
-    const ytdViews = ytdReels.reduce((sum, r) => sum + r.insights.views, 0);
-    const ytdReach = ytdReels.reduce((sum, r) => sum + r.insights.reach, 0);
-    const ytdShares = ytdReels.reduce((sum, r) => sum + r.insights.shares, 0);
-    const ytdSaves = ytdReels.reduce((sum, r) => sum + r.insights.saved, 0);
-    const ytdLikes = ytdReels.reduce((sum, r) => sum + r.like_count, 0);
-    const ytdComments = ytdReels.reduce((sum, r) => sum + r.comments_count, 0);
+    // 10. Sort and get top/bottom performers (from filtered set, all content types)
+    const sortedByImpressions = [...allFilteredInsights].sort((a, b) => b.insights.impressions - a.insights.impressions);
+    const topPerformers = sortedByImpressions.slice(0, 10);
+    const bottomPerformers = sortedByImpressions.filter(m => m.insights.impressions > 0).slice(-5).reverse();
 
-    // 8. Sort and get top/bottom performers
-    const sortedByViews = [...allReelInsights].sort((a, b) => b.insights.views - a.insights.views);
-    const topPerformers = sortedByViews.slice(0, 10);
-    const bottomPerformers = sortedByViews.slice(-5).reverse();
-
-    // 9. Format response
-    const formatReel = (r: MediaWithInsights) => ({
+    // 11. Format content for response
+    const formatContent = (r: MediaWithInsights) => ({
       id: r.id,
       caption: r.caption?.slice(0, 100) || '',
       timestamp: r.timestamp,
       permalink: r.permalink,
+      mediaType: r.media_type,
       likes: r.like_count,
       comments: r.comments_count,
-      views: r.insights.views,
+      impressions: r.insights.impressions,
+      views: r.insights.impressions, // alias for backwards compatibility
       reach: r.insights.reach,
       shares: r.insights.shares,
       saved: r.insights.saved,
@@ -210,6 +295,8 @@ export async function GET() {
     // Convert watch time to readable format
     const totalWatchTimeHours = Math.round(totalWatchTimeMs / 1000 / 60 / 60);
     const avgWatchTimeSec = Math.round(avgWatchTimeMs / 1000);
+    const lifetimeWatchTimeHours = Math.round(lifetimeWatchTimeMs / 1000 / 60 / 60);
+    const lifetimeAvgWatchTimeSec = Math.round(lifetimeAvgWatchTimeMs / 1000);
 
     const responseData = {
       // Account Overview
@@ -230,7 +317,7 @@ export async function GET() {
         interactions: totalInteractions,
       },
 
-      // Content Library
+      // Content Library (all time counts)
       contentBreakdown: {
         total: igInfo.media_count,
         reels: reels.length,
@@ -238,67 +325,102 @@ export async function GET() {
         carousels: carousels.length,
       },
 
-      // *** KEY METRICS FOR TOTAL VIEWS ***
+      // *** TOTAL VIEWS / IMPRESSIONS — ALL CONTENT ***
       totalViews: {
-        reels: totalReelViews,
-        // Images and carousels don't have views in the same way
-        allContent: totalReelViews, // For now, total views = reel views
+        reels: lifetimeReelViews,
+        allContent: lifetimeReelViews, // lifetime: only reels have full insights fetched
       },
 
-      // YTD Stats (Year-to-Date)
+      // YTD / Filtered Stats — NOW INCLUDES ALL CONTENT TYPES
       ytd: {
         year: now.getFullYear(),
-        reelCount: ytdReels.length,
-        views: ytdViews,
-        reach: ytdReach,
-        likes: ytdLikes,
-        comments: ytdComments,
-        shares: ytdShares,
-        saves: ytdSaves,
-        avgViewsPerReel: ytdReels.length > 0 ? Math.round(ytdViews / ytdReels.length) : 0,
+        // Date range
+        from: filterStart.toISOString().split('T')[0],
+        to: filterEnd.toISOString().split('T')[0],
+        // Total content
+        contentCount: filteredMedia.length,
+        reelCount: filteredReels.length,
+        imageCount: filteredImages.length,
+        carouselCount: filteredCarousels.length,
+        // Combined metrics (all content types)
+        views: totalFilteredImpressions, // reel views + image impressions + carousel impressions
+        reach: totalFilteredReach,
+        likes: totalFilteredLikes,
+        comments: totalFilteredComments,
+        shares: totalFilteredShares,
+        saves: totalFilteredSaves,
+        avgViewsPerContent: filteredMedia.length > 0 ? Math.round(totalFilteredImpressions / filteredMedia.length) : 0,
+        // Kept for backwards compat
+        avgViewsPerReel: filteredReels.length > 0 ? Math.round(reelImpressions / filteredReels.length) : 0,
+        // Breakdown by type
+        byType: {
+          reels: {
+            count: filteredReels.length,
+            impressions: reelImpressions,
+            reach: reelReach,
+            shares: reelShares,
+            saves: reelSaves,
+            watchTimeHours: totalWatchTimeHours,
+            avgWatchTimeSec: avgWatchTimeSec,
+          },
+          images: {
+            count: filteredImages.length,
+            impressions: imageImpressions,
+            reach: imageReach,
+            saves: imageSaves,
+          },
+          carousels: {
+            count: filteredCarousels.length,
+            impressions: carouselImpressions,
+            reach: carouselReach,
+            saves: carouselSaves,
+          },
+        },
       },
 
-      // Aggregate Stats (All Content)
+      // Aggregate Stats (All Content, basic fields)
       allTimeStats: {
         totalLikes: totalLikes,
         totalComments: totalComments,
-        totalShares: totalShares,
-        totalSaves: totalSaves,
-        avgLikesPerPost: Math.round(totalLikes / allMedia.length),
-        avgCommentsPerPost: Math.round(totalComments / allMedia.length),
+        totalShares: lifetimeReelShares,
+        totalSaves: lifetimeReelSaves,
+        avgLikesPerPost: allMedia.length > 0 ? Math.round(totalLikes / allMedia.length) : 0,
+        avgCommentsPerPost: allMedia.length > 0 ? Math.round(totalComments / allMedia.length) : 0,
       },
 
-      // Reels Performance
+      // Reels Performance (lifetime — backwards compatible)
       reelsPerformance: {
         totalReels: reels.length,
-        totalViews: totalReelViews,
-        totalReach: totalReelReach,
-        totalShares: totalShares,
-        totalSaves: totalSaves,
-        totalWatchTimeHours: totalWatchTimeHours,
-        avgWatchTimeSec: avgWatchTimeSec,
-        avgViewsPerReel: Math.round(totalReelViews / reels.length),
+        totalViews: lifetimeReelViews,
+        totalReach: lifetimeReelReach,
+        totalShares: lifetimeReelShares,
+        totalSaves: lifetimeReelSaves,
+        totalWatchTimeHours: lifetimeWatchTimeHours,
+        avgWatchTimeSec: lifetimeAvgWatchTimeSec,
+        avgViewsPerReel: reels.length > 0 ? Math.round(lifetimeReelViews / reels.length) : 0,
         avgEngagementRate: allReelInsights.length > 0
           ? (allReelInsights.reduce((sum, r) => sum + r.engagementRate, 0) / allReelInsights.length).toFixed(2) + '%'
           : '0%',
-        bestPerformers: topPerformers.map(formatReel),
-        needsImprovement: bottomPerformers.map(formatReel),
+        bestPerformers: topPerformers.map(formatContent),
+        needsImprovement: bottomPerformers.map(formatContent),
       },
 
       // Metadata
       _meta: {
         generatedAt: new Date().toISOString(),
         apiVersion: 'v18.0',
+        totalMediaFetched: allMedia.length,
+        insightsAnalyzed: allFilteredInsights.length,
         reelsAnalyzed: allReelInsights.length,
-        note: 'totalViews represents actual view count across all Reels',
+        note: 'views = reel views + image impressions + carousel impressions across all content types',
         fromCache: false,
         cacheInfo: getCacheInfo(),
         nextRefresh: getTimeUntilRefresh(),
       },
     };
 
-    // Store in cache for next requests until 5am ET
-    setCache(CACHE_KEY, responseData);
+    // Store in cache
+    setCache(cacheKey, responseData);
 
     return NextResponse.json(responseData);
   } catch (error) {

@@ -2,21 +2,36 @@
 
 import { useState, useEffect } from 'react';
 import MetricCard from '@/components/MetricCard';
-import { Instagram, Eye, Heart, TrendingUp, Users, MessageCircle, Share2, Bookmark, ExternalLink, Clock, Play } from 'lucide-react';
+import {
+  Instagram, Eye, Heart, TrendingUp, Users, MessageCircle,
+  Share2, Bookmark, ExternalLink, Clock, Play, Image, LayoutGrid
+} from 'lucide-react';
 
-interface ReelData {
+interface ContentData {
   id: string;
   caption: string;
   timestamp: string;
   permalink: string;
+  mediaType: string;
   likes: number;
   comments: number;
+  impressions: number;
   views: number;
   reach: number;
   shares: number;
   saved: number;
   avgWatchTimeSec: number;
   engagementRate: string;
+}
+
+interface TypeBreakdown {
+  count: number;
+  impressions: number;
+  reach: number;
+  saves: number;
+  shares?: number;
+  watchTimeHours?: number;
+  avgWatchTimeSec?: number;
 }
 
 interface InstagramData {
@@ -46,14 +61,23 @@ interface InstagramData {
   };
   ytd: {
     year: number;
+    contentCount: number;
     reelCount: number;
+    imageCount: number;
+    carouselCount: number;
     views: number;
     reach: number;
     likes: number;
     comments: number;
     shares: number;
     saves: number;
+    avgViewsPerContent: number;
     avgViewsPerReel: number;
+    byType: {
+      reels: TypeBreakdown;
+      images: TypeBreakdown;
+      carousels: TypeBreakdown;
+    };
   };
   allTimeStats: {
     totalLikes: number;
@@ -73,14 +97,25 @@ interface InstagramData {
     avgWatchTimeSec: number;
     avgViewsPerReel: number;
     avgEngagementRate: string;
-    bestPerformers: ReelData[];
-    needsImprovement: ReelData[];
+    bestPerformers: ContentData[];
+    needsImprovement: ContentData[];
   };
   _meta?: {
     generatedAt: string;
     fromCache?: boolean;
+    insightsAnalyzed?: number;
   };
   error?: string;
+}
+
+function MediaTypeBadge({ type }: { type: string }) {
+  const config: Record<string, { label: string; color: string }> = {
+    VIDEO: { label: 'Reel', color: 'bg-purple-500/20 text-purple-400' },
+    IMAGE: { label: 'Image', color: 'bg-blue-500/20 text-blue-400' },
+    CAROUSEL_ALBUM: { label: 'Carousel', color: 'bg-amber-500/20 text-amber-400' },
+  };
+  const c = config[type] || { label: type, color: 'bg-gray-500/20 text-gray-400' };
+  return <span className={`text-xs px-2 py-0.5 rounded-full ${c.color}`}>{c.label}</span>;
 }
 
 export default function InstagramPage() {
@@ -116,7 +151,7 @@ export default function InstagramPage() {
           <div className="h-8 bg-gray-700 rounded w-1/3 mb-4"></div>
           <div className="h-16 bg-gray-700 rounded w-1/2"></div>
         </div>
-        <p className="text-gray-400">Loading insights for all Reels... This may take a moment.</p>
+        <p className="text-gray-400">Loading insights for all content (Reels, Images, Carousels)... This may take a moment.</p>
       </div>
     );
   }
@@ -141,6 +176,7 @@ export default function InstagramPage() {
   if (!data) return null;
 
   const currentYear = data.ytd?.year || new Date().getFullYear();
+  const byType = data.ytd?.byType;
 
   return (
     <div className="space-y-8">
@@ -159,27 +195,25 @@ export default function InstagramPage() {
             <span className="text-gray-400">Updated</span>
             <span className="text-white font-medium">
               {new Date(data._meta.generatedAt).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
               })}
             </span>
           </div>
         )}
       </div>
 
-      {/* PRIMARY METRIC: 2026 YTD Views */}
+      {/* PRIMARY METRIC: YTD Total Impressions (All Content) */}
       <div className="metric-card bg-gradient-to-r from-[#E4405F]/20 to-gray-800 border-2 border-[#E4405F]">
         <div className="flex items-center gap-3 mb-2">
-          <Play className="text-[#E4405F]" size={28} />
-          <h2 className="text-lg text-gray-300">{currentYear} YTD Reel Views</h2>
+          <Eye className="text-[#E4405F]" size={28} />
+          <h2 className="text-lg text-gray-300">{currentYear} YTD Total Impressions</h2>
         </div>
         <div className="text-5xl font-bold text-brand-lime">
           {(data.ytd?.views || 0).toLocaleString()}
         </div>
-        <p className="text-gray-400 mt-2">{data.ytd?.reelCount || 0} reels posted in {currentYear}</p>
+        <p className="text-gray-400 mt-2">
+          {data.ytd?.contentCount || 0} posts in {currentYear} — {data.ytd?.reelCount || 0} Reels, {data.ytd?.imageCount || 0} Images, {data.ytd?.carouselCount || 0} Carousels
+        </p>
 
         {/* YTD Breakdown */}
         <div className="mt-6 pt-4 border-t border-gray-700">
@@ -191,7 +225,9 @@ export default function InstagramPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500">YTD Engagement</p>
-              <p className="text-lg font-bold text-white">{((data.ytd?.likes || 0) + (data.ytd?.comments || 0) + (data.ytd?.shares || 0)).toLocaleString()}</p>
+              <p className="text-lg font-bold text-white">
+                {((data.ytd?.likes || 0) + (data.ytd?.comments || 0) + (data.ytd?.shares || 0)).toLocaleString()}
+              </p>
               <p className="text-xs text-gray-500">likes + comments + shares</p>
             </div>
             <div>
@@ -200,7 +236,7 @@ export default function InstagramPage() {
               <p className="text-xs text-gray-500">current</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Lifetime Views</p>
+              <p className="text-xs text-gray-500">Lifetime Reel Views</p>
               <p className="text-lg font-bold text-gray-400">{data.totalViews.reels.toLocaleString()}</p>
               <p className="text-xs text-gray-500">{data.reelsPerformance.totalReels} total reels</p>
             </div>
@@ -211,18 +247,18 @@ export default function InstagramPage() {
       {/* YTD Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label={`${currentYear} YTD Views`}
+          label={`${currentYear} Total Impressions`}
           value={(data.ytd?.views || 0).toLocaleString()}
-          change={`${data.ytd?.reelCount || 0} reels posted`}
+          change={`${data.ytd?.contentCount || 0} posts`}
           changeType="positive"
-          icon={<Play size={20} className="text-[#E4405F]" />}
+          icon={<Eye size={20} className="text-[#E4405F]" />}
         />
         <MetricCard
           label={`${currentYear} YTD Reach`}
           value={(data.ytd?.reach || 0).toLocaleString()}
           change="Unique accounts"
           changeType="positive"
-          icon={<Eye size={20} />}
+          icon={<Users size={20} />}
         />
         <MetricCard
           label="Followers"
@@ -232,13 +268,103 @@ export default function InstagramPage() {
           icon={<Users size={20} />}
         />
         <MetricCard
-          label="Lifetime Views"
-          value={data.totalViews.reels.toLocaleString()}
-          change={`${data.reelsPerformance.totalReels} total reels`}
-          changeType="neutral"
-          icon={<Eye size={20} className="text-gray-400" />}
+          label="Avg Impressions/Post"
+          value={(data.ytd?.avgViewsPerContent || 0).toLocaleString()}
+          change={`${currentYear} YTD`}
+          changeType="positive"
+          icon={<TrendingUp size={20} className="text-brand-lime" />}
         />
       </div>
+
+      {/* Content Type Breakdown */}
+      {byType && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Reels */}
+          <div className="metric-card border-l-4 border-purple-500">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Play size={20} className="text-purple-400" />
+                Reels
+              </h3>
+              <span className="text-sm text-gray-500">{byType.reels.count} posts</span>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Views</span>
+                <span className="font-bold text-white">{byType.reels.impressions.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Reach</span>
+                <span className="font-bold">{byType.reels.reach.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Shares</span>
+                <span className="font-bold">{(byType.reels.shares || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Saves</span>
+                <span className="font-bold">{byType.reels.saves.toLocaleString()}</span>
+              </div>
+              {byType.reels.watchTimeHours !== undefined && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Watch Time</span>
+                  <span className="font-bold text-brand-lime">{byType.reels.watchTimeHours}h</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Images */}
+          <div className="metric-card border-l-4 border-blue-500">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Image size={20} className="text-blue-400" />
+                Images
+              </h3>
+              <span className="text-sm text-gray-500">{byType.images.count} posts</span>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Impressions</span>
+                <span className="font-bold text-white">{byType.images.impressions.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Reach</span>
+                <span className="font-bold">{byType.images.reach.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Saves</span>
+                <span className="font-bold">{byType.images.saves.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Carousels */}
+          <div className="metric-card border-l-4 border-amber-500">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <LayoutGrid size={20} className="text-amber-400" />
+                Carousels
+              </h3>
+              <span className="text-sm text-gray-500">{byType.carousels.count} posts</span>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Impressions</span>
+                <span className="font-bold text-white">{byType.carousels.impressions.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Reach</span>
+                <span className="font-bold">{byType.carousels.reach.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Saves</span>
+                <span className="font-bold">{byType.carousels.saves.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* YTD vs Lifetime Comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -246,19 +372,19 @@ export default function InstagramPage() {
         <div className="metric-card border-l-4 border-[#E4405F]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Play size={20} className="text-[#E4405F]" />
+              <Eye size={20} className="text-[#E4405F]" />
               {currentYear} YTD Performance
             </h3>
-            <span className="text-sm text-gray-500">{data.ytd?.reelCount || 0} reels</span>
+            <span className="text-sm text-gray-500">{data.ytd?.contentCount || 0} posts</span>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-gray-400">Total Views</span>
+              <span className="text-gray-400">Total Impressions</span>
               <span className="font-bold text-white">{(data.ytd?.views || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Avg Views/Reel</span>
-              <span className="font-bold text-brand-lime">{(data.ytd?.avgViewsPerReel || 0).toLocaleString()}</span>
+              <span className="text-gray-400">Avg/Post</span>
+              <span className="font-bold text-brand-lime">{(data.ytd?.avgViewsPerContent || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Total Likes</span>
@@ -279,12 +405,12 @@ export default function InstagramPage() {
           </div>
         </div>
 
-        {/* Lifetime Stats */}
+        {/* Lifetime Reels Stats */}
         <div className="metric-card border-l-4 border-gray-500">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <TrendingUp size={20} className="text-gray-400" />
-              Lifetime Performance
+              Lifetime Reel Performance
             </h3>
             <span className="text-sm text-gray-500">{data.reelsPerformance.totalReels} reels</span>
           </div>
@@ -341,7 +467,7 @@ export default function InstagramPage() {
         <div className="metric-card">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Clock size={20} className="text-gray-400" />
-            Watch Time
+            Watch Time (Reels)
           </h3>
           <div className="text-4xl font-bold text-white">{data.reelsPerformance.totalWatchTimeHours.toLocaleString()}h</div>
           <p className="text-gray-400 mt-2">Total watch time across all Reels</p>
@@ -352,22 +478,23 @@ export default function InstagramPage() {
             </div>
           </div>
         </div>
+
         <div className="metric-card">
           <div className="flex items-center gap-2 mb-4">
-            <Users size={20} className="text-gray-400" />
+            <LayoutGrid size={20} className="text-gray-400" />
             <h3 className="text-lg font-semibold">Content Library</h3>
           </div>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <div className="text-2xl font-bold text-brand-lime">{data.contentBreakdown.reels}</div>
+              <div className="text-2xl font-bold text-purple-400">{data.contentBreakdown.reels}</div>
               <p className="text-xs text-gray-500">Reels</p>
             </div>
             <div>
-              <div className="text-2xl font-bold">{data.contentBreakdown.images}</div>
+              <div className="text-2xl font-bold text-blue-400">{data.contentBreakdown.images}</div>
               <p className="text-xs text-gray-500">Images</p>
             </div>
             <div>
-              <div className="text-2xl font-bold">{data.contentBreakdown.carousels}</div>
+              <div className="text-2xl font-bold text-amber-400">{data.contentBreakdown.carousels}</div>
               <p className="text-xs text-gray-500">Carousels</p>
             </div>
           </div>
@@ -402,44 +529,49 @@ export default function InstagramPage() {
         </div>
       </div>
 
-      {/* Best Performers */}
+      {/* Best Performers (All Content Types) */}
       <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4 text-green-400">Top Performing Reels (by Views)</h3>
+        <h3 className="text-lg font-semibold mb-4 text-green-400">Top Performing Content (by Impressions)</h3>
         <div className="space-y-3">
-          {data.reelsPerformance.bestPerformers.slice(0, 5).map((reel, index) => (
-            <div key={reel.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+          {data.reelsPerformance.bestPerformers.slice(0, 5).map((content, index) => (
+            <div key={content.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-6 h-6 bg-[#E4405F] rounded-full text-xs font-bold">
                   {index + 1}
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-300 truncate max-w-md">
-                    {reel.caption || 'No caption'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <MediaTypeBadge type={content.mediaType} />
+                    <p className="text-sm text-gray-300 truncate max-w-md">
+                      {content.caption || 'No caption'}
+                    </p>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {new Date(reel.timestamp).toLocaleDateString()}
+                    {new Date(content.timestamp).toLocaleDateString()}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
-                  <Play size={14} className="text-purple-400" />
-                  <span className="font-semibold text-purple-400">{reel.views.toLocaleString()}</span>
+                  <Eye size={14} className="text-purple-400" />
+                  <span className="font-semibold text-purple-400">{content.impressions.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Heart size={14} className="text-red-400" />
-                  <span>{reel.likes.toLocaleString()}</span>
+                  <span>{content.likes.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Eye size={14} className="text-blue-400" />
-                  <span>{reel.reach.toLocaleString()}</span>
+                  <Users size={14} className="text-blue-400" />
+                  <span>{content.reach.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Share2 size={14} className="text-green-400" />
-                  <span>{reel.shares}</span>
-                </div>
-                <span className="text-brand-lime font-medium">{reel.engagementRate}</span>
-                <a href={reel.permalink} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+                {content.shares > 0 && (
+                  <div className="flex items-center gap-1">
+                    <Share2 size={14} className="text-green-400" />
+                    <span>{content.shares}</span>
+                  </div>
+                )}
+                <span className="text-brand-lime font-medium">{content.engagementRate}</span>
+                <a href={content.permalink} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
                   <ExternalLink size={14} />
                 </a>
               </div>
@@ -450,29 +582,32 @@ export default function InstagramPage() {
 
       {/* Needs Improvement */}
       <div className="metric-card">
-        <h3 className="text-lg font-semibold mb-4 text-yellow-400">Needs Improvement (Lowest Views)</h3>
+        <h3 className="text-lg font-semibold mb-4 text-yellow-400">Needs Improvement (Lowest Impressions)</h3>
         <div className="space-y-3">
-          {data.reelsPerformance.needsImprovement.map((reel, index) => (
-            <div key={reel.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+          {data.reelsPerformance.needsImprovement.map((content) => (
+            <div key={content.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
               <div className="flex-1">
-                <p className="text-sm text-gray-300 truncate max-w-md">
-                  {reel.caption || 'No caption'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <MediaTypeBadge type={content.mediaType} />
+                  <p className="text-sm text-gray-300 truncate max-w-md">
+                    {content.caption || 'No caption'}
+                  </p>
+                </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {new Date(reel.timestamp).toLocaleDateString()}
+                  {new Date(content.timestamp).toLocaleDateString()}
                 </p>
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
-                  <Play size={14} className="text-purple-400" />
-                  <span>{reel.views.toLocaleString()}</span>
+                  <Eye size={14} className="text-purple-400" />
+                  <span>{content.impressions.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Heart size={14} className="text-red-400" />
-                  <span>{reel.likes.toLocaleString()}</span>
+                  <span>{content.likes.toLocaleString()}</span>
                 </div>
-                <span className="text-yellow-400 font-medium">{reel.engagementRate}</span>
-                <a href={reel.permalink} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+                <span className="text-yellow-400 font-medium">{content.engagementRate}</span>
+                <a href={content.permalink} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
                   <ExternalLink size={14} />
                 </a>
               </div>

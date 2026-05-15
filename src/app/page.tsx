@@ -93,7 +93,7 @@ export default function OverviewPage() {
 
   // Content counts
   const youtubeFilteredVideos = youtubeData?.ytd?.totalVideos || 0;
-  const instagramFilteredReels = instagramData?.ytd?.reelCount || 0;
+  const instagramFilteredContent = instagramData?.ytd?.contentCount || instagramData?.ytd?.reelCount || 0;
   const facebookFilteredVideos = facebookData?.ytd?.videoCount || 0;
   const tiktokFilteredPosts = tiktokPostsData?.totals?.postCount || 0;
 
@@ -107,7 +107,7 @@ export default function OverviewPage() {
     ? youtubeFilteredViews + instagramFilteredViews + facebookFilteredViews + tiktokFilteredViews
     : youtubeLifetimeViews + instagramLifetimeViews + facebookLifetimeViews + tiktokFilteredViews;
 
-  const totalContent = youtubeFilteredVideos + instagramFilteredReels + facebookFilteredVideos + tiktokFilteredPosts;
+  const totalContent = youtubeFilteredVideos + instagramFilteredContent + facebookFilteredVideos + tiktokFilteredPosts;
 
   // Audience
   const youtubeSubscribers = youtubeData?.subscriberCount || 0;
@@ -287,17 +287,17 @@ export default function OverviewPage() {
           <div className="text-3xl font-bold text-brand-lime">
             {loading ? '...' : (isFiltered ? instagramFilteredViews : instagramLifetimeViews).toLocaleString()}
           </div>
-          <p className="text-sm text-gray-400">{config.label} Reel Views</p>
+          <p className="text-sm text-gray-400">{config.label} Impressions</p>
           <div className="mt-3 pt-3 border-t border-gray-700 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Reels</span>
-              <span className="text-white">{instagramFilteredReels}</span>
+              <span className="text-gray-500">Content</span>
+              <span className="text-white">{instagramFilteredContent}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Avg Views/Reel</span>
+              <span className="text-gray-500">Avg/Post</span>
               <span className="text-white">
-                {instagramFilteredReels > 0
-                  ? Math.round(instagramFilteredViews / instagramFilteredReels).toLocaleString()
+                {instagramFilteredContent > 0
+                  ? Math.round(instagramFilteredViews / instagramFilteredContent).toLocaleString()
                   : '--'}
               </span>
             </div>
@@ -415,7 +415,7 @@ export default function OverviewPage() {
               <div className="text-2xl font-bold">
                 {loading ? '...' : instagramLifetimeViews.toLocaleString()}
               </div>
-              <p className="text-sm text-gray-400">Total reel views</p>
+              <p className="text-sm text-gray-400">Total impressions</p>
             </div>
             <div className="metric-card">
               <div className="flex items-center gap-2 mb-3">
