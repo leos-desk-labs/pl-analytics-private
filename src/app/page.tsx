@@ -44,13 +44,15 @@ export default function OverviewPage() {
   const [instagramData, setInstagramData] = useState<any>(null);
   const [facebookData, setFacebookData] = useState<any>(null);
   const [tiktokPostsData, setTiktokPostsData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // allLoaded = true only when every platform has responded (or errored).
+  // Individual platform cards render progressively as each resolves.
+  const [allLoaded, setAllLoaded] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const config = VIEW_CONFIG[viewMode];
 
   const fetchData = useCallback(async (mode: ViewMode) => {
-    setLoading(true);
+    setAllLoaded(false);
     setYoutubeData(null);
     setInstagramData(null);
     setFacebookData(null);
@@ -62,18 +64,15 @@ export default function OverviewPage() {
     if (cfg.to) params.set('to', cfg.to);
     const qs = params.toString() ? `?${params.toString()}` : '';
 
-    // Fire all fetches independently — each updates state as it arrives
-    // This way fast APIs (YouTube, TikTok) render immediately while slow ones (IG, FB) load in the background
+    // Fire all fetches independently — each updates its own state as it arrives.
+    // Platform cards render progressively; aggregate totals wait for ALL to finish.
     let resolved = 0;
-    const checkDone = () => { resolved++; if (resolved >= 4) setLoading(false); };
+    const checkDone = () => { resolved++; if (resolved >= 4) setAllLoaded(true); };
 
     fetch(`/api/youtube${qs}`).then(r => r.json()).then(d => setYoutubeData(d)).catch(() => {}).finally(checkDone);
     fetch(`/api/instagram${qs}`).then(r => r.json()).then(d => setInstagramData(d?.error ? null : d)).catch(() => {}).finally(checkDone);
     fetch(`/api/facebook${qs}`).then(r => r.json()).then(d => setFacebookData(d?.error ? null : d)).catch(() => {}).finally(checkDone);
     fetch(`/api/tiktok-posts${qs}`).then(r => r.json()).then(d => setTiktokPostsData(d?.error ? null : d)).catch(() => {}).finally(checkDone);
-
-    // Remove initial loading state once the first API responds (show partial data fast)
-    setTimeout(() => setLoading(false), 5000);
   }, []);
 
   useEffect(() => {
@@ -175,10 +174,12 @@ export default function OverviewPage() {
             </p>
             <p className="text-gray-500 text-xs mb-3">{config.subtitle}</p>
             <div className="text-6xl md:text-7xl font-bold text-brand-lime tracking-tight">
-              {loading ? '...' : primaryViews.toLocaleString()}
+              {!allLoaded ? '...' : primaryViews.toLocaleString()}
             </div>
             <p className="text-gray-500 text-sm mt-2">
-              {totalContent} pieces of content across {activePlatforms} platforms
+              {!allLoaded
+                ? 'Loading all platforms...'
+                : `${totalContent} pieces of content across ${activePlatforms} platforms`}
             </p>
           </div>
 
@@ -189,7 +190,7 @@ export default function OverviewPage() {
               <>
                 <div>
                   <div className="text-2xl md:text-3xl font-bold text-white">
-                    {loading ? '...' : avgViewsPerDay.toLocaleString()}
+                    {!allLoaded ? '...' : avgViewsPerDay.toLocaleString()}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">avg/day</p>
                 </div>
@@ -198,14 +199,14 @@ export default function OverviewPage() {
             )}
             <div>
               <div className="text-2xl md:text-3xl font-bold text-white">
-                {loading ? '...' : totalAudience.toLocaleString()}
+                {!allLoaded ? '...' : totalAudience.toLocaleString()}
               </div>
               <p className="text-xs text-gray-500 mt-1">total audience</p>
             </div>
             <div className="w-px h-10 bg-gray-700" />
             <div>
               <div className="text-2xl md:text-3xl font-bold text-white">
-                {loading ? '...' : totalContent.toString()}
+                {!allLoaded ? '...' : totalContent.toString()}
               </div>
               <p className="text-xs text-gray-500 mt-1">total content</p>
             </div>
@@ -217,21 +218,21 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           label={`${config.label} Views`}
-          value={loading ? '...' : primaryViews.toLocaleString()}
+          value={!allLoaded ? '...' : primaryViews.toLocaleString()}
           change={`${totalContent} pieces of content`}
           changeType="positive"
           icon={<Play size={20} className="text-brand-lime" />}
         />
         <MetricCard
           label="Content Posted"
-          value={loading ? '...' : totalContent.toString()}
+          value={!allLoaded ? '...' : totalContent.toString()}
           change={config.subtitle}
           changeType="positive"
           icon={<Calendar size={20} />}
         />
         <MetricCard
           label="Total Audience"
-          value={loading ? '...' : totalAudience.toLocaleString()}
+          value={!allLoaded ? '...' : totalAudience.toLocaleString()}
           change="subscribers + followers"
           changeType="neutral"
           icon={<Target size={20} />}
@@ -256,7 +257,7 @@ export default function OverviewPage() {
             {youtubeData && <span className="text-xs text-green-400 ml-auto">Live</span>}
           </div>
           <div className="text-3xl font-bold text-brand-lime">
-            {loading ? '...' : (isFiltered ? youtubeFilteredViews : youtubeLifetimeViews).toLocaleString()}
+            {!youtubeData ? '...' : (isFiltered ? youtubeFilteredViews : youtubeLifetimeViews).toLocaleString()}
           </div>
           <p className="text-sm text-gray-400">{config.label} Views</p>
           <div className="mt-3 pt-3 border-t border-gray-700 space-y-2">
@@ -285,7 +286,7 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="text-3xl font-bold text-brand-lime">
-            {loading ? '...' : (isFiltered ? instagramFilteredViews : instagramLifetimeViews).toLocaleString()}
+            {!instagramData ? '...' : (isFiltered ? instagramFilteredViews : instagramLifetimeViews).toLocaleString()}
           </div>
           <p className="text-sm text-gray-400">{config.label} Impressions</p>
           <div className="mt-3 pt-3 border-t border-gray-700 space-y-2">
@@ -314,7 +315,7 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="text-3xl font-bold text-brand-lime">
-            {loading ? '...' : (isFiltered ? facebookFilteredViews : facebookLifetimeViews).toLocaleString()}
+            {!facebookData ? '...' : (isFiltered ? facebookFilteredViews : facebookLifetimeViews).toLocaleString()}
           </div>
           <p className="text-sm text-gray-400">{config.label} Video Views</p>
           <div className="mt-3 pt-3 border-t border-gray-700 space-y-2">
@@ -343,7 +344,7 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="text-3xl font-bold text-brand-lime">
-            {loading ? '...' : tiktokFilteredViews.toLocaleString()}
+            {!tiktokPostsData ? '...' : tiktokFilteredViews.toLocaleString()}
           </div>
           <p className="text-sm text-gray-400">{config.label} Video Views</p>
           <div className="mt-3 pt-3 border-t border-gray-700 space-y-2">
@@ -372,7 +373,7 @@ export default function OverviewPage() {
       )}
 
       {/* Views Growth Chart */}
-      {!loading && (
+      {allLoaded && (
         <ViewsGrowthChart
           youtubeTotal={isFiltered ? youtubeFilteredViews : youtubeLifetimeViews}
           instagramTotal={isFiltered ? instagramFilteredViews : instagramLifetimeViews}
@@ -381,7 +382,7 @@ export default function OverviewPage() {
       )}
 
       {/* Growth Metrics */}
-      {!loading && (
+      {allLoaded && (
         <GrowthMetrics
           youtubeViews={isFiltered ? youtubeFilteredViews : youtubeLifetimeViews}
           instagramViews={isFiltered ? instagramFilteredViews : instagramLifetimeViews}
@@ -403,7 +404,7 @@ export default function OverviewPage() {
                 <span className="font-semibold">YouTube</span>
               </div>
               <div className="text-2xl font-bold">
-                {loading ? '...' : youtubeLifetimeViews.toLocaleString()}
+                {!allLoaded ? '...' : youtubeLifetimeViews.toLocaleString()}
               </div>
               <p className="text-sm text-gray-400">Total channel views</p>
             </div>
@@ -413,7 +414,7 @@ export default function OverviewPage() {
                 <span className="font-semibold">Instagram</span>
               </div>
               <div className="text-2xl font-bold">
-                {loading ? '...' : instagramLifetimeViews.toLocaleString()}
+                {!allLoaded ? '...' : instagramLifetimeViews.toLocaleString()}
               </div>
               <p className="text-sm text-gray-400">Total impressions</p>
             </div>
@@ -423,7 +424,7 @@ export default function OverviewPage() {
                 <span className="font-semibold">Facebook</span>
               </div>
               <div className="text-2xl font-bold">
-                {loading ? '...' : facebookLifetimeViews.toLocaleString()}
+                {!allLoaded ? '...' : facebookLifetimeViews.toLocaleString()}
               </div>
               <p className="text-sm text-gray-400">Total video views</p>
             </div>
@@ -433,7 +434,7 @@ export default function OverviewPage() {
                 <span className="font-semibold">TikTok</span>
               </div>
               <div className="text-2xl font-bold">
-                {loading ? '...' : tiktokFilteredViews.toLocaleString()}
+                {!allLoaded ? '...' : tiktokFilteredViews.toLocaleString()}
               </div>
               <p className="text-sm text-gray-400">Total tracked views</p>
             </div>
