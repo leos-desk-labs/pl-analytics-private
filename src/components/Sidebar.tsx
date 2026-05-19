@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const navItems = [
   { href: '/', label: 'Overview', icon: '◆', color: '#e7ff01' },
+  { href: '/executive-summary', label: 'Executive Summary', icon: '◈', color: '#CFFF04' },
   { href: '/youtube', label: 'YouTube', icon: '▶', color: '#FF0000' },
   { href: '/instagram', label: 'Instagram', icon: '◆', color: '#E4405F' },
   { href: '/tiktok', label: 'TikTok', icon: '♪', color: '#00f2ea' },
