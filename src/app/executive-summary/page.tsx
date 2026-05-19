@@ -209,12 +209,20 @@ export default function ExecutiveSummaryPage() {
       (tiktokData?.totals?.postCount || 0)
     : null;
 
-  // Total views — cross-platform (LIVE from APIs)
+  // Total IMPRESSIONS — all content, all platforms (LIVE from APIs)
+  const totalImpressions = allLoaded
+    ? (youtubeData?.ytd?.totalViews || 0) +          // YT: views = impressions (video plays)
+      (instagramData?.ytd?.impressions || 0) +       // IG: all content (reels + images + carousels)
+      (facebookData?.ytd?.videoViews || 0) +         // FB: video plays
+      (tiktokData?.totals?.views || 0)               // TT: auto-play starts
+    : null;
+
+  // Total VIDEO VIEWS — video plays only (LIVE from APIs)
   const totalViews = allLoaded
-    ? (youtubeData?.ytd?.totalViews || 0) +
-      (instagramData?.ytd?.views || 0) +
-      (facebookData?.ytd?.videoViews || 0) +
-      (tiktokData?.totals?.views || 0)
+    ? (youtubeData?.ytd?.totalViews || 0) +       // YT: 30-sec watch
+      (instagramData?.ytd?.views || 0) +           // IG: Reel plays only (3-sec)
+      (facebookData?.ytd?.videoViews || 0) +       // FB: video plays (3-sec)
+      (tiktokData?.totals?.views || 0)             // TT: auto-play starts
     : null;
 
   return (
@@ -232,21 +240,30 @@ export default function ExecutiveSummaryPage() {
         </p>
       </div>
 
-      {/* Top-line hero */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Top-line hero — dual metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-xl bg-gradient-to-br from-brand-lime/10 to-transparent border border-brand-lime/20 p-6">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Views YTD</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Impressions YTD</p>
           <p className="text-3xl font-bold text-brand-lime">
+            {totalImpressions !== null ? totalImpressions.toLocaleString() : '...'}
+          </p>
+          <p className="text-xs text-gray-600 mt-1">Every PL content display across 4 platforms</p>
+        </div>
+        <div className="rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-gray-700 p-6">
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Video Views YTD</p>
+          <p className="text-3xl font-bold text-white">
             {totalViews !== null ? totalViews.toLocaleString() : '...'}
           </p>
-          <p className="text-xs text-gray-600 mt-1">Across 4 platforms</p>
+          <p className="text-xs text-gray-600 mt-1">Video plays only — the engagement metric</p>
         </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-gray-700 p-6">
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Content Published</p>
           <p className="text-3xl font-bold text-white">
             {totalContent !== null ? totalContent.toLocaleString() : '...'}
           </p>
-          <p className="text-xs text-gray-600 mt-1">YTD 2026</p>
+          <p className="text-xs text-gray-600 mt-1">YTD 2026 across all platforms</p>
         </div>
         <div className="rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-gray-700 p-6">
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Platforms Active</p>

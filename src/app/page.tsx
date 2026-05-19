@@ -79,15 +79,22 @@ export default function OverviewPage() {
   }, [viewMode, fetchData]);
 
   // ====================================
-  // VIEWS BY MODE
+  // VIEWS vs IMPRESSIONS — IMPORTANT DISTINCTION
+  // ====================================
+  // "Views" = someone watched: YT 30-sec, IG Reels 3-sec, FB 3-sec, TikTok auto-play
+  // "Impressions" = content was displayed (includes IG images/carousels, TikTok auto-play)
+  // The hero total uses VIEWS only for an apples-to-apples comparison.
   // ====================================
   const isFiltered = viewMode !== 'all';
 
-  // YTD / filtered views (from the ytd object the API returns)
+  // YTD / filtered VIEWS — video plays only (strictest available metric per platform)
   const youtubeFilteredViews = youtubeData?.ytd?.totalViews || 0;
-  const instagramFilteredViews = instagramData?.ytd?.views || 0;
-  const facebookFilteredViews = facebookData?.ytd?.videoViews || 0;
-  const tiktokFilteredViews = tiktokPostsData?.totals?.views || 0;
+  const instagramFilteredViews = instagramData?.ytd?.views || 0; // Reel plays only (3-sec)
+  const facebookFilteredViews = facebookData?.ytd?.videoViews || 0; // Video plays (3-sec)
+  const tiktokFilteredViews = tiktokPostsData?.totals?.views || 0; // Auto-play starts
+
+  // YTD / filtered IMPRESSIONS — all content displayed (broader metric)
+  const instagramFilteredImpressions = instagramData?.ytd?.impressions || 0; // Reels + images + carousels
 
   // Content counts
   const youtubeFilteredVideos = youtubeData?.ytd?.totalVideos || 0;
@@ -100,10 +107,15 @@ export default function OverviewPage() {
   const instagramLifetimeViews = instagramData?.totalViews?.reels || instagramData?.reelsPerformance?.totalViews || 0;
   const facebookLifetimeViews = facebookData?.lifetime?.videoViews || facebookData?.videoViews || 0;
 
-  // Computed totals depending on mode
+  // Computed totals depending on mode — VIEWS only (apples-to-apples)
   const primaryViews = isFiltered
     ? youtubeFilteredViews + instagramFilteredViews + facebookFilteredViews + tiktokFilteredViews
     : youtubeLifetimeViews + instagramLifetimeViews + facebookLifetimeViews + tiktokFilteredViews;
+
+  // Total impressions (broader — includes IG image/carousel impressions)
+  const totalImpressions = isFiltered
+    ? youtubeFilteredViews + instagramFilteredImpressions + facebookFilteredViews + tiktokFilteredViews
+    : primaryViews; // Lifetime doesn't have separate impressions
 
   const totalContent = youtubeFilteredVideos + instagramFilteredContent + facebookFilteredVideos + tiktokFilteredPosts;
 
@@ -124,10 +136,10 @@ export default function OverviewPage() {
   const daysElapsed = isFiltered ? getDaysElapsed() : 0;
   const avgViewsPerDay = daysElapsed > 0 ? Math.round(primaryViews / daysElapsed) : 0;
 
-  // Chart data
+  // Chart data — uses impressions (hero metric) for the platform breakdown
   const viewsByPlatform = [
     { name: 'YouTube', value: isFiltered ? youtubeFilteredViews : youtubeLifetimeViews, color: '#FF0000' },
-    { name: 'Instagram', value: isFiltered ? instagramFilteredViews : instagramLifetimeViews, color: '#E4405F' },
+    { name: 'Instagram', value: isFiltered ? instagramFilteredImpressions : instagramLifetimeViews, color: '#E4405F' },
     { name: 'Facebook', value: isFiltered ? facebookFilteredViews : facebookLifetimeViews, color: '#1877F2' },
     { name: 'TikTok', value: tiktokFilteredViews, color: '#00f2ea' },
   ].filter(p => p.value > 0);
@@ -161,7 +173,7 @@ export default function OverviewPage() {
         ))}
       </div>
 
-      {/* Primary Metric Hero */}
+      {/* Dual Metric Hero — Impressions + Video Views side by side */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-brand-lime/30">
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-brand-lime/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-brand-teal/10 rounded-full blur-3xl" />
@@ -172,15 +184,42 @@ export default function OverviewPage() {
               {config.label}
             </p>
             <p className="text-gray-500 text-xs mb-3">{config.subtitle}</p>
-            <div className="text-6xl md:text-7xl font-bold text-brand-lime tracking-tight">
-              {!allLoaded ? '...' : primaryViews.toLocaleString()}
-            </div>
-            <p className="text-gray-500 text-sm mt-2">
-              {!allLoaded
-                ? 'Loading all platforms...'
-                : `${totalContent} pieces of content across ${activePlatforms} platforms`}
-            </p>
           </div>
+
+          {/* Side-by-side hero metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-6">
+            {/* Total Impressions */}
+            <div className="text-center md:text-right md:border-r md:border-gray-700 md:pr-8">
+              <div className="text-5xl md:text-6xl font-bold text-brand-lime tracking-tight">
+                {!allLoaded ? '...' : totalImpressions.toLocaleString()}
+              </div>
+              <p className="text-brand-lime/60 text-xs font-semibold mt-1 uppercase tracking-wider">
+                Total Impressions
+              </p>
+              <p className="text-gray-600 text-[10px] mt-1">
+                Every time PL content was displayed to a viewer
+              </p>
+            </div>
+
+            {/* Video Views */}
+            <div className="text-center md:text-left md:pl-8">
+              <div className="text-5xl md:text-6xl font-bold text-white tracking-tight">
+                {!allLoaded ? '...' : primaryViews.toLocaleString()}
+              </div>
+              <p className="text-gray-400 text-xs font-semibold mt-1 uppercase tracking-wider">
+                Video Views
+              </p>
+              <p className="text-gray-600 text-[10px] mt-1">
+                Viewers who watched video content
+              </p>
+            </div>
+          </div>
+
+          <p className="text-gray-500 text-sm text-center mb-6">
+            {!allLoaded
+              ? 'Loading all platforms...'
+              : `${totalContent} pieces of content across ${activePlatforms} platforms`}
+          </p>
 
           <div className="w-24 h-px bg-gradient-to-r from-transparent via-brand-lime/50 to-transparent mx-auto mb-6" />
 
@@ -191,7 +230,7 @@ export default function OverviewPage() {
                   <div className="text-2xl md:text-3xl font-bold text-white">
                     {!allLoaded ? '...' : avgViewsPerDay.toLocaleString()}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">avg/day</p>
+                  <p className="text-xs text-gray-500 mt-1">avg views/day</p>
                 </div>
                 <div className="w-px h-10 bg-gray-700" />
               </>
@@ -216,11 +255,11 @@ export default function OverviewPage() {
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label={`${config.label} Views`}
-          value={!allLoaded ? '...' : primaryViews.toLocaleString()}
-          change={`${totalContent} pieces of content`}
+          label={`${config.label} Impressions`}
+          value={!allLoaded ? '...' : totalImpressions.toLocaleString()}
+          change="All content, all platforms"
           changeType="positive"
-          icon={<Play size={20} className="text-brand-lime" />}
+          icon={<Eye size={20} className="text-brand-lime" />}
         />
         <MetricCard
           label="Content Posted"
@@ -285,10 +324,14 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="text-3xl font-bold text-brand-lime">
-            {!instagramData ? '...' : (isFiltered ? instagramFilteredViews : instagramLifetimeViews).toLocaleString()}
+            {!instagramData ? '...' : (isFiltered ? instagramFilteredImpressions : instagramLifetimeViews).toLocaleString()}
           </div>
           <p className="text-sm text-gray-400">{config.label} Impressions</p>
           <div className="mt-3 pt-3 border-t border-gray-700 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Reel Views</span>
+              <span className="text-white">{instagramFilteredViews.toLocaleString()}</span>
+            </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Content</span>
               <span className="text-white">{instagramFilteredContent}</span>
@@ -297,7 +340,7 @@ export default function OverviewPage() {
               <span className="text-gray-500">Avg/Post</span>
               <span className="text-white">
                 {instagramFilteredContent > 0
-                  ? Math.round(instagramFilteredViews / instagramFilteredContent).toLocaleString()
+                  ? Math.round(instagramFilteredImpressions / instagramFilteredContent).toLocaleString()
                   : '--'}
               </span>
             </div>
@@ -366,7 +409,7 @@ export default function OverviewPage() {
       {/* Views Distribution Chart */}
       {viewsByPlatform.length > 0 && (
         <div className="metric-card">
-          <h3 className="text-lg font-semibold mb-4">{config.label} Views by Platform</h3>
+          <h3 className="text-lg font-semibold mb-4">{config.label} Impressions by Platform</h3>
           <SimpleChart data={viewsByPlatform} color="#e7ff01" type="bar" />
         </div>
       )}
@@ -375,7 +418,7 @@ export default function OverviewPage() {
       {allLoaded && (
         <ViewsGrowthChart
           youtubeTotal={isFiltered ? youtubeFilteredViews : youtubeLifetimeViews}
-          instagramTotal={isFiltered ? instagramFilteredViews : instagramLifetimeViews}
+          instagramTotal={isFiltered ? instagramFilteredImpressions : instagramLifetimeViews}
           facebookTotal={isFiltered ? facebookFilteredViews : facebookLifetimeViews}
         />
       )}
@@ -384,7 +427,7 @@ export default function OverviewPage() {
       {allLoaded && (
         <GrowthMetrics
           youtubeViews={isFiltered ? youtubeFilteredViews : youtubeLifetimeViews}
-          instagramViews={isFiltered ? instagramFilteredViews : instagramLifetimeViews}
+          instagramViews={isFiltered ? instagramFilteredImpressions : instagramLifetimeViews}
           facebookViews={isFiltered ? facebookFilteredViews : facebookLifetimeViews}
           youtubeSubscribers={youtubeSubscribers}
           instagramFollowers={instagramFollowers}
@@ -459,6 +502,21 @@ export default function OverviewPage() {
             <Facebook className="text-[#1877F2] mx-auto mb-2" size={20} />
             <div className="text-xl font-bold">{facebookFollowers?.toLocaleString() || '--'}</div>
             <p className="text-xs text-gray-500">Followers</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Metric Definitions */}
+      <div className="metric-card bg-gray-800/20 border border-gray-800">
+        <h3 className="text-sm font-semibold mb-3 text-gray-500 uppercase tracking-wider">How We Count</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-500 leading-relaxed">
+          <div>
+            <p className="font-medium text-gray-400 mb-1">Total Impressions</p>
+            <p>Every time PL content was displayed to a viewer — across all platforms and all content types (videos, images, carousels). YouTube and TikTok count plays. Instagram and Facebook count displays. This is the standard media buying metric (CPM).</p>
+          </div>
+          <div>
+            <p className="font-medium text-gray-400 mb-1">Video Views</p>
+            <p>YouTube: 30-second watch. Instagram: Reel plays (3-sec). Facebook: video views (3-sec). TikTok: auto-play starts. This counts only video content and excludes static image/carousel displays.</p>
           </div>
         </div>
       </div>

@@ -26,6 +26,7 @@ interface ContentData {
 
 interface TypeBreakdown {
   count: number;
+  views?: number;
   impressions: number;
   reach: number;
   saves: number;
@@ -68,12 +69,13 @@ interface InstagramData {
     imageCount: number;
     carouselCount: number;
     views: number;
+    impressions: number;
     reach: number;
     likes: number;
     comments: number;
     shares: number;
     saves: number;
-    avgViewsPerContent: number;
+    avgImpressionsPerContent: number;
     avgViewsPerReel: number;
     byType: {
       reels: TypeBreakdown;
@@ -204,15 +206,20 @@ export default function InstagramPage() {
         )}
       </div>
 
-      {/* PRIMARY METRIC: YTD Total Impressions (All Content) */}
+      {/* PRIMARY METRIC: YTD Reel Views */}
       <div className="metric-card bg-gradient-to-r from-[#E4405F]/20 to-gray-800 border-2 border-[#E4405F]">
         <div className="flex items-center gap-3 mb-2">
           <Eye className="text-[#E4405F]" size={28} />
-          <h2 className="text-lg text-gray-300">{currentYear} YTD Total Impressions</h2>
+          <h2 className="text-lg text-gray-300">{currentYear} YTD Reel Views</h2>
         </div>
         <div className="text-5xl font-bold text-brand-lime">
           {(data.ytd?.views || 0).toLocaleString()}
         </div>
+        {(data.ytd?.impressions || 0) > (data.ytd?.views || 0) && (
+          <p className="text-xs text-gray-600 mt-1">
+            {(data.ytd?.impressions || 0).toLocaleString()} total impressions (incl. image/carousel displays)
+          </p>
+        )}
         <p className="text-gray-400 mt-2">
           {data.ytd?.contentCount || 0} posts in {currentYear} — {data.ytd?.reelCount || 0} Reels, {data.ytd?.imageCount || 0} Images, {data.ytd?.carouselCount || 0} Carousels
         </p>
@@ -271,7 +278,7 @@ export default function InstagramPage() {
         />
         <MetricCard
           label="Avg Impressions/Post"
-          value={(data.ytd?.avgViewsPerContent || 0).toLocaleString()}
+          value={(data.ytd?.avgImpressionsPerContent || 0).toLocaleString()}
           change={`${currentYear} YTD`}
           changeType="positive"
           icon={<TrendingUp size={20} className="text-brand-lime" />}
@@ -394,7 +401,7 @@ export default function InstagramPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Avg/Post</span>
-              <span className="font-bold text-brand-lime">{(data.ytd?.avgViewsPerContent || 0).toLocaleString()}</span>
+              <span className="font-bold text-brand-lime">{(data.ytd?.avgImpressionsPerContent || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Total Likes</span>

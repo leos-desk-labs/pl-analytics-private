@@ -21,8 +21,10 @@ interface MediaItem {
 }
 
 interface MediaInsights {
-  // Reels use "views", Images/Carousels use "impressions" — we normalize to "impressions"
-  impressions: number;
+  // Reels: "views" = 3-sec plays. Images/Carousels: "impressions" = times displayed.
+  // These are NOT equivalent metrics — we track both separately.
+  views: number;        // Reel plays (3-sec threshold). 0 for images/carousels.
+  impressions: number;  // Times content displayed. For reels, this equals views.
   reach: number;
   shares: number;
   saved: number;
@@ -56,7 +58,7 @@ async function fetchMediaInsights(media: MediaItem): Promise<MediaWithInsights> 
       // Some older content may not support insights — fall back gracefully
       return {
         ...media,
-        insights: { impressions: 0, reach: 0, shares: 0, saved: 0, totalWatchTimeMs: 0, avgWatchTimeMs: 0 },
+        insights: { views: 0, impressions: 0, reach: 0, shares: 0, saved: 0, totalWatchTimeMs: 0, avgWatchTimeMs: 0 },
         engagementRate: 0,
       };
     }
@@ -64,7 +66,10 @@ async function fetchMediaInsights(media: MediaItem): Promise<MediaWithInsights> 
     const getMetricValue = (name: string) =>
       insights.data?.find((i: { name: string }) => i.name === name)?.values?.[0]?.value || 0;
 
-    const impressions = isReel ? getMetricValue('views') : getMetricValue('impressions');
+    // Reels: "views" = 3-sec plays (comparable to YouTube views)
+    // Images/Carousels: only "impressions" available (times displayed, NOT plays)
+    const reelViews = isReel ? getMetricValue('views') : 0;
+    const imgImpressions = !isReel ? getMetricValue('impressions') : 0;
     const reach = getMetricValue('reach');
     const shares = isReel ? getMetricValue('shares') : 0;
     const saved = getMetricValue('saved');
@@ -72,7 +77,8 @@ async function fetchMediaInsights(media: MediaItem): Promise<MediaWithInsights> 
     const avgWatchTimeMs = isReel ? getMetricValue('ig_reels_avg_watch_time') : 0;
 
     const mediaInsights: MediaInsights = {
-      impressions,
+      views: reelViews,
+      impressions: isReel ? reelViews : imgImpressions, // For backwards compat, impressions = views for reels
       reach,
       shares,
       saved,
@@ -90,7 +96,7 @@ async function fetchMediaInsights(media: MediaItem): Promise<MediaWithInsights> 
   } catch {
     return {
       ...media,
-      insights: { impressions: 0, reach: 0, shares: 0, saved: 0, totalWatchTimeMs: 0, avgWatchTimeMs: 0 },
+      insights: { views: 0, impressions: 0, reach: 0, shares: 0, saved: 0, totalWatchTimeMs: 0, avgWatchTimeMs: 0 },
       engagementRate: 0,
     };
   }
@@ -220,6 +226,9 @@ export async function GET(request: Request) {
     const carouselInsights = allFilteredInsights.filter(m => m.media_type === 'CAROUSEL_ALBUM');
 
     // 8. Calculate aggregate stats — ALL CONTENT
+    // Views = reel plays only (3-sec threshold, comparable to YouTube views)
+    const totalFilteredViews = allFilteredInsights.reduce((sum, r) => sum + r.insights.views, 0);
+    // Impressions = all content displayed (reels use views as proxy, images/carousels use impressions)
     const totalFilteredImpressions = allFilteredInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
     const totalFilteredReach = allFilteredInsights.reduce((sum, r) => sum + r.insights.reach, 0);
     const totalFilteredShares = allFilteredInsights.reduce((sum, r) => sum + r.insights.shares, 0);
@@ -228,6 +237,7 @@ export async function GET(request: Request) {
     const totalFilteredComments = allFilteredInsights.reduce((sum, r) => sum + (r.comments_count || 0), 0);
 
     // Reel-specific stats
+    const reelViews = reelInsights.reduce((sum, r) => sum + r.insights.views, 0);
     const reelImpressions = reelInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
     const reelReach = reelInsights.reduce((sum, r) => sum + r.insights.reach, 0);
     const reelShares = reelInsights.reduce((sum, r) => sum + r.insights.shares, 0);
@@ -268,7 +278,7 @@ export async function GET(request: Request) {
     }
 
     const allReelInsights = [...reelInsights, ...remainingReelInsights];
-    const lifetimeReelViews = allReelInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
+    const lifetimeReelViews = allReelInsights.reduce((sum, r) => sum + r.insights.views, 0);
     const lifetimeReelReach = allReelInsights.reduce((sum, r) => sum + r.insights.reach, 0);
     const lifetimeReelShares = allReelInsights.reduce((sum, r) => sum + r.insights.shares, 0);
     const lifetimeReelSaves = allReelInsights.reduce((sum, r) => sum + r.insights.saved, 0);
@@ -291,8 +301,8 @@ export async function GET(request: Request) {
       mediaType: r.media_type,
       likes: r.like_count,
       comments: r.comments_count,
-      impressions: r.insights.impressions,
-      views: r.insights.impressions, // alias for backwards compatibility
+      views: r.insights.views,         // Reel plays (3-sec). 0 for images/carousels.
+      impressions: r.insights.impressions, // Times displayed (all content types)
       reach: r.insights.reach,
       shares: r.insights.shares,
       saved: r.insights.saved,
@@ -350,20 +360,21 @@ export async function GET(request: Request) {
         reelCount: filteredReels.length,
         imageCount: filteredImages.length,
         carouselCount: filteredCarousels.length,
-        // Combined metrics (all content types)
-        views: totalFilteredImpressions, // reel views + image impressions + carousel impressions
+        // Separated metrics — DO NOT mix these in aggregate totals
+        views: totalFilteredViews,          // Reel plays only (3-sec threshold) — comparable to YouTube views
+        impressions: totalFilteredImpressions, // All content: reel views + image/carousel impressions
         reach: totalFilteredReach,
         likes: totalFilteredLikes,
         comments: totalFilteredComments,
         shares: totalFilteredShares,
         saves: totalFilteredSaves,
-        avgViewsPerContent: filteredMedia.length > 0 ? Math.round(totalFilteredImpressions / filteredMedia.length) : 0,
-        // Kept for backwards compat
-        avgViewsPerReel: filteredReels.length > 0 ? Math.round(reelImpressions / filteredReels.length) : 0,
+        avgViewsPerReel: filteredReels.length > 0 ? Math.round(reelViews / filteredReels.length) : 0,
+        avgImpressionsPerContent: filteredMedia.length > 0 ? Math.round(totalFilteredImpressions / filteredMedia.length) : 0,
         // Breakdown by type
         byType: {
           reels: {
             count: filteredReels.length,
+            views: reelViews,
             impressions: reelImpressions,
             reach: reelReach,
             shares: reelShares,
@@ -426,7 +437,10 @@ export async function GET(request: Request) {
         totalMediaFetched: allMedia.length,
         insightsAnalyzed: allFilteredInsights.length,
         reelsAnalyzed: allReelInsights.length,
-        note: 'views = reel views + image impressions + carousel impressions across all content types',
+        metricDefinitions: {
+          views: 'Reel plays only (3-sec threshold). Comparable to YouTube views. Does NOT include images/carousels.',
+          impressions: 'All content displayed. For reels = views; for images/carousels = times shown. NOT comparable to YouTube views.',
+        },
         fromCache: false,
         cacheInfo: getCacheInfo(),
         nextRefresh: getTimeUntilRefresh(),
