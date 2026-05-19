@@ -1,3 +1,4 @@
+// Deploy trigger: 2026-05-19 18:01:24
 'use client';
 
 import { useState, useEffect } from 'react';
