@@ -10,7 +10,6 @@ import {
   Instagram,
   Facebook,
   Music2,
-  Twitter,
   Eye,
   TrendingUp,
   Target,
@@ -239,8 +238,8 @@ export default function OverviewPage() {
         />
         <MetricCard
           label="Platforms Active"
-          value={`${activePlatforms} of 5`}
-          change="YouTube, Instagram, Facebook, TikTok, X"
+          value={`${activePlatforms} of 4`}
+          change="YouTube, Instagram, Facebook, TikTok"
           changeType="neutral"
           icon={<TrendingUp size={20} />}
         />
@@ -464,19 +463,6 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* X Coming Soon (only X remains) */}
-      <h2 className="text-xl font-semibold text-gray-500">Coming Soon</h2>
-      <div className="grid grid-cols-1 md:grid-cols-1 gap-4 max-w-sm">
-        <div className="metric-card border-l-4 border-gray-500 opacity-60">
-          <div className="flex items-center gap-2 mb-3">
-            <Twitter size={24} />
-            <span className="font-semibold">X</span>
-            <span className="text-xs text-yellow-400 ml-auto">Coming Soon</span>
-          </div>
-          <div className="text-2xl font-bold">--</div>
-          <p className="text-sm text-gray-400">Video Views</p>
-        </div>
-      </div>
     </div>
   );
 }

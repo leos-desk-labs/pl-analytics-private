@@ -9,7 +9,6 @@ const navItems = [
   { href: '/instagram', label: 'Instagram', icon: '◆', color: '#E4405F' },
   { href: '/tiktok', label: 'TikTok', icon: '♪', color: '#00f2ea' },
   { href: '/facebook', label: 'Facebook', icon: 'f', color: '#1877F2' },
-  { href: '/x', label: 'X', icon: '𝕏', color: '#ffffff' },
 ];
 
 export default function Sidebar() {

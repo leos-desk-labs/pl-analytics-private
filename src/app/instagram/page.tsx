@@ -30,6 +30,8 @@ interface TypeBreakdown {
   reach: number;
   saves: number;
   shares?: number;
+  likes?: number;
+  comments?: number;
   watchTimeHours?: number;
   avgWatchTimeSec?: number;
 }
@@ -298,6 +300,14 @@ export default function InstagramPage() {
                 <span className="font-bold">{byType.reels.reach.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-gray-400">Likes</span>
+                <span className="font-bold">{(byType.reels.likes || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Comments</span>
+                <span className="font-bold">{(byType.reels.comments || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-gray-400">Shares</span>
                 <span className="font-bold">{(byType.reels.shares || 0).toLocaleString()}</span>
               </div>
@@ -325,12 +335,12 @@ export default function InstagramPage() {
             </div>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-400">Impressions</span>
-                <span className="font-bold text-white">{byType.images.impressions.toLocaleString()}</span>
+                <span className="text-gray-400">Likes</span>
+                <span className="font-bold text-white">{(byType.images.likes || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Reach</span>
-                <span className="font-bold">{byType.images.reach.toLocaleString()}</span>
+                <span className="text-gray-400">Comments</span>
+                <span className="font-bold">{(byType.images.comments || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Saves</span>
@@ -350,12 +360,12 @@ export default function InstagramPage() {
             </div>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-400">Impressions</span>
-                <span className="font-bold text-white">{byType.carousels.impressions.toLocaleString()}</span>
+                <span className="text-gray-400">Likes</span>
+                <span className="font-bold text-white">{(byType.carousels.likes || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Reach</span>
-                <span className="font-bold">{byType.carousels.reach.toLocaleString()}</span>
+                <span className="text-gray-400">Comments</span>
+                <span className="font-bold">{(byType.carousels.comments || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Saves</span>

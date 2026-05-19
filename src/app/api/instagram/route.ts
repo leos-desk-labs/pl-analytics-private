@@ -241,11 +241,19 @@ export async function GET(request: Request) {
     const imageImpressions = imageInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
     const imageReach = imageInsights.reduce((sum, r) => sum + r.insights.reach, 0);
     const imageSaves = imageInsights.reduce((sum, r) => sum + r.insights.saved, 0);
+    const imageLikes = imageInsights.reduce((sum, r) => sum + (r.like_count || 0), 0);
+    const imageComments = imageInsights.reduce((sum, r) => sum + (r.comments_count || 0), 0);
 
     // Carousel-specific stats
     const carouselImpressions = carouselInsights.reduce((sum, r) => sum + r.insights.impressions, 0);
     const carouselReach = carouselInsights.reduce((sum, r) => sum + r.insights.reach, 0);
     const carouselSaves = carouselInsights.reduce((sum, r) => sum + r.insights.saved, 0);
+    const carouselLikes = carouselInsights.reduce((sum, r) => sum + (r.like_count || 0), 0);
+    const carouselComments = carouselInsights.reduce((sum, r) => sum + (r.comments_count || 0), 0);
+
+    // Reel engagement from basic fields
+    const reelLikes = reelInsights.reduce((sum, r) => sum + (r.like_count || 0), 0);
+    const reelComments = reelInsights.reduce((sum, r) => sum + (r.comments_count || 0), 0);
 
     // 9. Also fetch insights for ALL reels (lifetime) for lifetime totals
     // Only fetch reels not already in the filtered set
@@ -360,6 +368,8 @@ export async function GET(request: Request) {
             reach: reelReach,
             shares: reelShares,
             saves: reelSaves,
+            likes: reelLikes,
+            comments: reelComments,
             watchTimeHours: totalWatchTimeHours,
             avgWatchTimeSec: avgWatchTimeSec,
           },
@@ -368,12 +378,16 @@ export async function GET(request: Request) {
             impressions: imageImpressions,
             reach: imageReach,
             saves: imageSaves,
+            likes: imageLikes,
+            comments: imageComments,
           },
           carousels: {
             count: filteredCarousels.length,
             impressions: carouselImpressions,
             reach: carouselReach,
             saves: carouselSaves,
+            likes: carouselLikes,
+            comments: carouselComments,
           },
         },
       },
